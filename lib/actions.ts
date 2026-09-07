@@ -235,11 +235,26 @@ export async function adminAddGroup(
   return newGroup;
 }
 
+export async function deleteRoom(roomId: string): Promise<{ success: boolean }> {
+  await assertAdmin();
+
+  const rooms = await getRoomsCollection();
+  const contestants = await getContestantsCollection();
+  const questions = await getQuestionsCollection();
+
+  await rooms.deleteOne({ id: roomId });
+  await contestants.deleteMany({ roomId });
+  await questions.deleteMany({ roomId });
+
+  return { success: true };
+}
+
 export async function adminRemoveGroup(roomId: string, contestantId: string) {
   await assertAdmin();
 
   const contestants = await getContestantsCollection();
   await contestants.deleteOne({ id: contestantId, roomId });
+  await contestants.deleteMany({ roomId, parentGroupId: contestantId });
 
   // Re-index remaining groups joinOrder (1..N)
   const remainingGroups = await contestants
@@ -255,7 +270,22 @@ export async function adminRemoveGroup(roomId: string, contestantId: string) {
   }
 
   const rooms = await getRoomsCollection();
-  await rooms.updateOne({ id: roomId }, { $inc: { version: 1 } });
+  const room = await rooms.findOne({ id: roomId });
+  if (room && room.activeContestantId === contestantId) {
+    await rooms.updateOne(
+      { id: roomId },
+      {
+        $set: {
+          activeContestantId: remainingGroups.length > 0 ? remainingGroups[0].id : null,
+          passCount: 0,
+          timerEndsAt: null,
+        },
+        $inc: { version: 1 },
+      }
+    );
+  } else {
+    await rooms.updateOne({ id: roomId }, { $inc: { version: 1 } });
+  }
 }
 
 export async function setRound(roomId: string, roundType: 'normal' | 'rapid_fire') {

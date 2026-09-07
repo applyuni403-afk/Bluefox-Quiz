@@ -1,7 +1,7 @@
 'use client';
 
 import { useTimer } from '@/lib/useTimer';
-import { Clock, AlertCircle } from 'lucide-react';
+import { Clock, AlertTriangle } from 'lucide-react';
 
 interface TimerProps {
   endsAt: string | Date | null | undefined;
@@ -13,9 +13,9 @@ export function Timer({ endsAt, size = 'md' }: TimerProps) {
 
   if (endsAt === null || endsAt === undefined) {
     return (
-      <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-400 font-mono text-sm font-semibold">
-        <Clock className="w-4 h-4" />
-        <span>Timer Paused</span>
+      <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/[0.03] border border-white/[0.08] text-zinc-500 font-mono text-xs font-semibold backdrop-blur-md">
+        <Clock className="w-3.5 h-3.5 text-zinc-600" />
+        <span>00:00</span>
       </div>
     );
   }
@@ -23,38 +23,47 @@ export function Timer({ endsAt, size = 'md' }: TimerProps) {
   const isLg = size === 'lg';
   const isSm = size === 'sm';
 
-  const colorStyles = isExpired
-    ? 'bg-rose-500/15 border-rose-500 text-rose-600 dark:text-rose-400'
-    : isCritical
-    ? 'bg-amber-500/15 border-amber-500 text-amber-600 dark:text-amber-400 animate-pulse'
-    : 'bg-emerald-500/15 border-emerald-500 text-emerald-600 dark:text-emerald-400';
+  let colorClasses = '';
+  if (isExpired) {
+    colorClasses =
+      'bg-rose-500/10 border-rose-500/40 text-rose-400 shadow-[0_0_30px_rgba(244,63,94,0.25)]';
+  } else if (isCritical) {
+    colorClasses =
+      'bg-amber-500/15 border-amber-500/50 text-amber-300 shadow-[0_0_30px_rgba(245,158,11,0.3)] animate-pulse';
+  } else {
+    colorClasses =
+      'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 shadow-[0_0_25px_rgba(16,185,129,0.15)]';
+  }
 
   return (
     <div
-      className={`inline-flex items-center justify-center border font-mono font-black transition-all duration-200 ${colorStyles} ${
+      className={`inline-flex items-center justify-center border font-mono font-black tracking-wider transition-all duration-300 backdrop-blur-xl ${colorClasses} ${
         isLg
-          ? 'px-8 py-4 rounded-2xl text-4xl sm:text-6xl gap-4 shadow-lg'
+          ? 'px-7 py-3 rounded-2xl text-4xl sm:text-5xl gap-3.5'
           : isSm
-          ? 'px-3 py-1.5 rounded-lg text-lg gap-1.5'
-          : 'px-5 py-2.5 rounded-xl text-2xl gap-2.5 shadow-sm'
+          ? 'px-3 py-1 rounded-full text-sm gap-1.5'
+          : 'px-5 py-2 rounded-xl text-xl sm:text-2xl gap-2.5'
       }`}
     >
       {isExpired ? (
-        <AlertCircle className={isLg ? 'w-10 h-10' : 'w-5 h-5'} />
+        <AlertTriangle className={isLg ? 'w-8 h-8 text-rose-400' : 'w-4 h-4 text-rose-400'} />
       ) : (
         <Clock
-          className={`${isLg ? 'w-10 h-10' : 'w-5 h-5'} ${
-            isRunning ? 'animate-spin text-current' : ''
+          className={`${isLg ? 'w-7 h-7' : 'w-4 h-4'} ${
+            isRunning ? 'animate-spin text-current opacity-80' : 'opacity-60'
           }`}
-          style={{ animationDuration: '4s' }}
+          style={{ animationDuration: '6s' }}
         />
       )}
-      <span>{isExpired ? '00:00' : formatted}</span>
+      <span className="drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]">
+        {isExpired ? '00:00' : formatted}
+      </span>
       {isExpired && (
-        <span className="text-xs uppercase tracking-widest font-sans ml-2 font-bold opacity-80">
-          Time&apos;s Up!
+        <span className="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30 font-sans">
+          Time
         </span>
       )}
     </div>
   );
 }
+
