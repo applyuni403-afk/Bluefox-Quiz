@@ -223,7 +223,7 @@ function JoinForm() {
           ) : (
             <>
               <Play className="w-3.5 h-3.5 fill-white" />
-              <span>Enter Quiz Arena</span>
+              <span>Enter Quiz</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </>
           )}
@@ -254,7 +254,7 @@ export default function JoinPage() {
         {/* Header */}
         <div className="text-center mb-8">
           <SiteLogo size="lg" className="mx-auto mb-4" />
-          <h1 className="text-2xl font-black tracking-tight text-slate-900">Join Quiz Arena</h1>
+          <h1 className="text-2xl font-black tracking-tight text-slate-900">Join Quiz</h1>
           <p className="text-xs text-slate-500 mt-1 font-medium">
             Enter 6-digit room code to join the live session
           </p>
@@ -265,7 +265,7 @@ export default function JoinPage() {
           fallback={
             <div className="p-8 text-center bg-white/80 backdrop-blur-2xl border border-blue-100 rounded-3xl">
               <RefreshCw className="w-5 h-5 animate-spin mx-auto text-blue-500 mb-2" />
-              <p className="text-xs text-slate-500">Loading arena...</p>
+              <p className="text-xs text-slate-500">Loading quiz...</p>
             </div>
           }
         >

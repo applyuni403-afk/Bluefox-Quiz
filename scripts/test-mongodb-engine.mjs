@@ -64,7 +64,7 @@ async function runTests() {
     const testRoom = {
       id: roomId,
       _id: roomId,
-      name: 'MongoDB Test Arena',
+      name: 'MongoDB Test Quiz',
       code: testCode,
       status: 'lobby',
       roundType: 'normal',

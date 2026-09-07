@@ -110,7 +110,7 @@ export default function PlayRoomPage({
     return (
       <div className="min-h-screen bg-[#edf2f9] text-slate-800 flex flex-col items-center justify-center p-6">
         <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mb-3" />
-        <p className="text-xs font-semibold text-slate-500">Connecting to arena...</p>
+        <p className="text-xs font-semibold text-slate-500">Connecting to quiz...</p>
       </div>
     );
   }
@@ -272,7 +272,7 @@ export default function PlayRoomPage({
 
         {/* Footer info */}
         <div className="text-center text-[11px] font-medium text-slate-500 z-10 uppercase tracking-wider">
-          Bluefox Quiz Arena &bull; Realtime Synchronized
+          Bluefox Quiz &bull; Realtime Synchronized
         </div>
       </div>
     );
@@ -316,7 +316,7 @@ export default function PlayRoomPage({
             href="/"
             className="inline-block px-6 py-3 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-bold uppercase tracking-wider transition active:scale-95 shadow-lg shadow-blue-500/25"
           >
-            Return to Arena Home
+            Return to Quiz Home
           </Link>
         </div>
       </div>
@@ -330,7 +330,7 @@ export default function PlayRoomPage({
     <div className="min-h-screen bg-[#edf2f9] text-slate-800 flex flex-col justify-between selection:bg-blue-500/20">
       <SoundPlayer lastResult={room.lastResult} />
 
-      {/* Arena Top Bar */}
+      {/* Quiz Top Bar */}
       <header className="border-b border-blue-200/60 px-4 sm:px-8 py-3.5 bg-white/80 backdrop-blur-2xl sticky top-0 z-40">
         <div className="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -453,7 +453,7 @@ export default function PlayRoomPage({
       </main>
 
       <footer className="border-t border-blue-200/50 px-6 py-4 text-center text-[10px] uppercase tracking-wider text-slate-400">
-        Bluefox Arena &bull; Continuous Live Sync
+        Bluefox Quiz &bull; Continuous Live Sync
       </footer>
     </div>
   );

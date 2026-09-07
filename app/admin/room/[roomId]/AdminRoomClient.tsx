@@ -217,7 +217,7 @@ export function AdminRoomClient({ roomId }: AdminRoomClientProps) {
               target="_blank"
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 shadow-2xs transition"
             >
-              <span>Arena View</span>
+              <span>Quiz View</span>
               <ExternalLink className="w-3 h-3 text-slate-500" />
             </Link>
 
@@ -275,7 +275,7 @@ export function AdminRoomClient({ roomId }: AdminRoomClientProps) {
         </div>
       </header>
 
-      {/* Main Studio Arena */}
+      {/* Main Studio Stage */}
       <main className="max-w-7xl mx-auto w-full px-6 py-6 flex-1 grid grid-cols-1 lg:grid-cols-3 gap-6 items-start z-10">
         {/* Left 2 Columns: Live Control Center */}
         <div className="lg:col-span-2 space-y-6">

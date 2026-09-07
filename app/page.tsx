@@ -15,7 +15,7 @@ export default function Home() {
           <div className="flex items-center gap-3">
             <SiteLogo size="md" />
             <span className="font-black text-lg tracking-tight text-slate-900 flex items-center gap-1.5">
-              BLUEFOX <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 border border-blue-200">ARENA</span>
+              BLUEFOX <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 border border-blue-200">QUIZ</span>
             </span>
           </div>
 
@@ -65,7 +65,7 @@ export default function Home() {
               <div className="w-12 h-12 rounded-2xl bg-blue-50 border border-blue-200 text-blue-600 flex items-center justify-center font-bold mb-4 group-hover:scale-105 transition-transform shadow-xs">
                 <Play className="w-5 h-5 fill-current" />
               </div>
-              <h3 className="text-xl font-black text-slate-900 mb-1.5">Enter Arena</h3>
+              <h3 className="text-xl font-black text-slate-900 mb-1.5">Enter Quiz</h3>
               <p className="text-xs text-slate-600 leading-relaxed">
                 Connect with team code and compete on live synchronized screens.
               </p>
@@ -113,7 +113,7 @@ export default function Home() {
 
       {/* Clean Minimal Footer */}
       <footer className="border-t border-blue-200/50 px-6 py-5 text-center text-[11px] font-semibold text-slate-500 tracking-wider uppercase">
-        Bluefox Quiz Arena &bull; Live Tournament Suite
+        Bluefox Quiz &bull; Live Tournament Suite
       </footer>
     </div>
   );

@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "Bluefox Quiz — Live Synchronized Arena",
+    default: "Bluefox Quiz — Live Synchronized Quiz",
     template: "%s | Bluefox Quiz",
   },
   description:
