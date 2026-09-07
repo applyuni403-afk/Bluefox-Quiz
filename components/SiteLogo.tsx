@@ -23,11 +23,12 @@ export function SiteLogo({ size = 'md', className = '', withGlow = true }: SiteL
       } ${className}`}
     >
       <Image
-        src="/logo.webp"
+        src="/bluefox-logo.webp"
         alt="Bluefox Logo"
         width={config.px}
         height={config.px}
         priority
+        unoptimized
         className="w-full h-full object-cover select-none pointer-events-none"
       />
     </div>

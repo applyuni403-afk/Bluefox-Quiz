@@ -5,7 +5,7 @@ const nextConfig: NextConfig = {
     return [
       {
         source: '/favicon.ico',
-        destination: '/logo.webp',
+        destination: '/bluefox-logo.webp',
       },
     ];
   },

@@ -21,11 +21,11 @@ export const metadata: Metadata = {
     "Real-time synchronized tournament quiz platform. Host-controlled multi-group trivia, custom timers, and rapid-fire rounds.",
   icons: {
     icon: [
-      { url: "/logo.webp", type: "image/webp" },
+      { url: "/bluefox-logo.webp", type: "image/webp" },
     ],
-    shortcut: ["/logo.webp"],
+    shortcut: ["/bluefox-logo.webp"],
     apple: [
-      { url: "/logo.webp", type: "image/webp" },
+      { url: "/bluefox-logo.webp", type: "image/webp" },
     ],
   },
 };
