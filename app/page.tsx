@@ -56,7 +56,7 @@ export default function Home() {
 
         {/* Action Portals */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5 w-full max-w-2xl mb-16 text-left">
-          {/* Player Portal */}
+          {/* Team Portal */}
           <Link
             href="/join"
             className="group relative p-7 rounded-3xl bg-white/80 hover:bg-white backdrop-blur-xl border border-blue-100 hover:border-blue-300 hover:shadow-[0_20px_45px_rgba(59,130,246,0.12)] transition-all duration-300 shadow-[0_10px_30px_rgba(30,58,138,0.05)] flex flex-col justify-between overflow-hidden"

@@ -25,7 +25,6 @@ export function ScoreBoard({
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [isAddingGroup, setIsAddingGroup] = useState(false);
   const [newGroupName, setNewGroupName] = useState('');
-  const [newGroupMembers, setNewGroupMembers] = useState('');
   const [addError, setAddError] = useState('');
   const [isSubmittingGroup, setIsSubmittingGroup] = useState(false);
 
@@ -81,30 +80,24 @@ export function ScoreBoard({
 
     const cleanName = newGroupName.trim();
     if (!cleanName) {
-      setAddError('Group name is required');
+      setAddError('Team name is required');
       return;
     }
 
     if (groups.length >= 8) {
-      setAddError('Room is full (8 groups maximum).');
+      setAddError('Room is full (8 teams maximum).');
       return;
     }
 
     setIsSubmittingGroup(true);
     try {
-      const members = newGroupMembers
-        .split(',')
-        .map((m) => m.trim())
-        .filter((m) => m.length > 0);
-
-      await adminAddGroup(roomId, cleanName, members);
+      await adminAddGroup(roomId, cleanName);
       toast.success('Team Registered', `"${cleanName}" joined the quiz.`);
       setNewGroupName('');
-      setNewGroupMembers('');
       setIsAddingGroup(false);
       if (onMutate) await onMutate();
     } catch (err) {
-      const msg = (err as Error).message || 'Failed to add group';
+      const msg = (err as Error).message || 'Failed to add team';
       setAddError(msg);
       toast.error('Registration Failed', msg);
     } finally {
@@ -199,14 +192,6 @@ export function ScoreBoard({
                 className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 shadow-2xs"
               />
 
-              <input
-                type="text"
-                value={newGroupMembers}
-                onChange={(e) => setNewGroupMembers(e.target.value)}
-                placeholder="Members (comma-separated, optional)"
-                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 shadow-2xs"
-              />
-
               <div className="flex justify-end gap-2 pt-1">
                 <button
                   type="button"
@@ -281,12 +266,6 @@ export function ScoreBoard({
                         </span>
                       )}
                     </div>
-
-                    {Array.isArray(group.members) && group.members.length > 0 && (
-                      <div className="text-[10px] text-slate-500 truncate">
-                        {group.members.join(', ')}
-                      </div>
-                    )}
                   </div>
                 </div>
 

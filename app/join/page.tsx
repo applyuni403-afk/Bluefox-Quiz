@@ -4,8 +4,8 @@ import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import useSWR from 'swr';
-import { Play, Users, Plus, X, ArrowRight, ShieldAlert, CheckCircle, RefreshCw, ChevronLeft } from 'lucide-react';
-import { joinRoom, checkRoomCapacity } from '@/lib/actions';
+import { Play, Users, ArrowRight, ShieldAlert, CheckCircle, RefreshCw, ChevronLeft, LogOut } from 'lucide-react';
+import { joinRoom, checkRoomCapacity, logoutContestant } from '@/lib/actions';
 import { SiteLogo } from '@/components/SiteLogo';
 import { useNotification } from '@/context/NotificationContext';
 
@@ -16,15 +16,85 @@ interface RecentRoom {
   joinedAt: number;
 }
 
+function getStoredSession(key: string) {
+  try {
+    const rawLocal = localStorage.getItem(`bluefox_contestant_${key}`);
+    const tokenLocal = localStorage.getItem(`bluefox_claim_token_${key}`);
+    const nameLocal = localStorage.getItem(`bluefox_team_name_${key}`);
+
+    const match = document.cookie.match(new RegExp(`(?:^|; )bluefox_team_${key}=([^;]*)`));
+    let cookieData: { id?: string; token?: string; name?: string } = {};
+    if (match && match[1]) {
+      try {
+        cookieData = JSON.parse(decodeURIComponent(match[1]));
+      } catch {
+        // ignore
+      }
+    }
+
+    const contestantId = rawLocal || cookieData.id || null;
+    const claimToken = tokenLocal || cookieData.token || null;
+    const teamName = nameLocal || cookieData.name || null;
+
+    if (contestantId && claimToken) {
+      return { contestantId, claimToken, teamName };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function saveStoredSession(
+  roomId: string,
+  code: string | undefined,
+  contestantId: string,
+  claimToken: string,
+  teamName: string
+) {
+  try {
+    const keys = Array.from(new Set([roomId, code].filter(Boolean))) as string[];
+    keys.forEach((k) => {
+      localStorage.setItem(`bluefox_contestant_${k}`, contestantId);
+      localStorage.setItem(`bluefox_claim_token_${k}`, claimToken);
+      localStorage.setItem(`bluefox_team_name_${k}`, teamName);
+      document.cookie = `bluefox_team_${k}=${encodeURIComponent(
+        JSON.stringify({ id: contestantId, token: claimToken, name: teamName })
+      )}; path=/; max-age=604800; SameSite=Lax`;
+    });
+    localStorage.setItem('bluefox_last_contestant_id', contestantId);
+    localStorage.setItem('bluefox_last_claim_token', claimToken);
+    localStorage.setItem('bluefox_last_room_id', roomId);
+  } catch {
+    // ignore
+  }
+}
+
+function clearStoredSession(roomId: string, code?: string) {
+  try {
+    const keys = Array.from(
+      new Set([roomId, code, localStorage.getItem('bluefox_last_room_id')].filter(Boolean))
+    ) as string[];
+    keys.forEach((k) => {
+      localStorage.removeItem(`bluefox_contestant_${k}`);
+      localStorage.removeItem(`bluefox_claim_token_${k}`);
+      localStorage.removeItem(`bluefox_team_name_${k}`);
+      document.cookie = `bluefox_team_${k}=; path=/; max-age=0; SameSite=Lax`;
+    });
+    localStorage.removeItem('bluefox_last_contestant_id');
+    localStorage.removeItem('bluefox_last_claim_token');
+  } catch {
+    // ignore
+  }
+}
+
 function JoinForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { toast } = useNotification();
+  const { toast, confirm } = useNotification();
 
   const [code, setCode] = useState('');
   const [groupName, setGroupName] = useState('');
-  const [memberName, setMemberName] = useState('');
-  const [members, setMembers] = useState<string[]>([]);
   const [recentRooms, setRecentRooms] = useState<RecentRoom[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -62,21 +132,36 @@ function JoinForm() {
     { refreshInterval: 2000 }
   );
 
-  const handleAddMember = () => {
-    if (!memberName.trim()) return;
-    if (members.length >= 10) return;
-    setMembers([...members, memberName.trim()]);
-    setMemberName('');
-  };
+  // Check if current device already has a claimed session in this room
+  const activeSessionKey = capacity?.roomId || (cleanInput.length >= 4 ? cleanInput : null);
+  const activeSession = activeSessionKey ? getStoredSession(activeSessionKey) : null;
 
-  const handleRemoveMember = (index: number) => {
-    setMembers(members.filter((_, i) => i !== index));
-  };
+  const handleSwitchOrLogout = async () => {
+    if (!activeSession || !activeSessionKey) return;
+    const confirmed = await confirm({
+      title: `Log Out Team "${activeSession.teamName || 'Current Team'}"?`,
+      message: 'This will release your team session so another device or a different team can be chosen.',
+      confirmText: 'Log Out',
+      cancelText: 'Stay Connected',
+      variant: 'warning',
+      icon: 'logout',
+    });
+    if (!confirmed) return;
 
-  const handleKeyDownMember = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      handleAddMember();
+    try {
+      setLoading(true);
+      await logoutContestant(
+        capacity?.roomId || activeSessionKey,
+        activeSession.contestantId,
+        activeSession.claimToken
+      );
+      clearStoredSession(capacity?.roomId || activeSessionKey, capacity?.code);
+      setGroupName('');
+      toast.info('Logged Out', 'Team session released. You can now select or enter a team.');
+    } catch (err) {
+      toast.error('Logout Failed', (err as Error).message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -91,30 +176,49 @@ function JoinForm() {
       return;
     }
     if (!groupName.trim()) {
-      const msg = 'Please enter a group / team name.';
+      const msg = 'Please enter a team name.';
       setError(msg);
       toast.warning('Input Required', msg);
       return;
     }
 
+    // If already claimed as another team in the same room, require explicit logout confirmation
+    if (
+      activeSession &&
+      activeSession.teamName &&
+      activeSession.teamName.toLowerCase() !== groupName.trim().toLowerCase()
+    ) {
+      const switchConfirmed = await confirm({
+        title: 'Switch Team Session?',
+        message: `You are currently connected as "${activeSession.teamName}". Would you like to log out from "${activeSession.teamName}" and join as "${groupName.trim()}"?`,
+        confirmText: 'Switch Team',
+        cancelText: 'Cancel',
+        variant: 'warning',
+        icon: 'logout',
+      });
+      if (!switchConfirmed) return;
+
+      await logoutContestant(
+        capacity?.roomId || activeSessionKey || code.trim(),
+        activeSession.contestantId,
+        activeSession.claimToken
+      );
+      clearStoredSession(capacity?.roomId || activeSessionKey || code.trim(), capacity?.code);
+    }
+
     setLoading(true);
     try {
-      const allMembers = memberName.trim()
-        ? [...members, memberName.trim()]
-        : members;
+      const currentToken = activeSession?.claimToken || getStoredSession(code.trim())?.claimToken;
+      const res = await joinRoom(code, groupName, [], currentToken);
 
-      const res = await joinRoom(code, groupName, allMembers);
-
-      if (res?.success && res.roomId && res.contestantId) {
-        localStorage.setItem(`bluefox_contestant_${res.roomId}`, res.contestantId);
-        if (capacity?.code) {
-          localStorage.setItem(`bluefox_contestant_${capacity.code}`, res.contestantId);
-        }
-        if (code.trim()) {
-          localStorage.setItem(`bluefox_contestant_${code.trim()}`, res.contestantId);
-        }
-        localStorage.setItem('bluefox_last_contestant_id', res.contestantId);
-        localStorage.setItem('bluefox_last_room_id', res.roomId);
+      if (res?.success && res.roomId && res.contestantId && res.claimToken) {
+        saveStoredSession(
+          res.roomId,
+          capacity?.code || (code.trim().length === 6 ? code.trim().toUpperCase() : undefined),
+          res.contestantId,
+          res.claimToken,
+          res.groupName || groupName.trim()
+        );
 
         // Save to recent rooms list
         try {
@@ -124,7 +228,7 @@ function JoinForm() {
           list.unshift({
             roomId: res.roomId,
             roomCode: capacity?.code || (code.trim().length === 6 ? code.trim().toUpperCase() : undefined),
-            groupName: groupName.trim(),
+            groupName: res.groupName || groupName.trim(),
             joinedAt: Date.now(),
           });
           localStorage.setItem('bluefox_recent_rooms', JSON.stringify(list.slice(0, 5)));
@@ -133,9 +237,9 @@ function JoinForm() {
         }
 
         if (res.reconnected) {
-          toast.success('Reconnected', `Welcome back, ${groupName}!`);
+          toast.success('Reconnected', `Welcome back, ${res.groupName || groupName}!`);
         } else {
-          toast.success('Team Joined', `Welcome, "${groupName}"!`);
+          toast.success('Team Joined', `Welcome, "${res.groupName || groupName}"!`);
         }
 
         router.push(`/play/${res.roomId}`);
@@ -196,6 +300,40 @@ function JoinForm() {
           </div>
         )}
 
+        {/* Active Session Notification Card */}
+        {activeSession && activeSession.teamName && capacity?.roomId && (
+          <div className="mb-6 p-4 rounded-2xl bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-blue-600 block">
+                  Active Team Session
+                </span>
+                <p className="text-sm font-black text-slate-900">
+                  Connected as: <span className="text-blue-700">{activeSession.teamName}</span>
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleSwitchOrLogout}
+                disabled={loading}
+                title="Log out from this team session"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-rose-50 border border-blue-200 hover:border-rose-200 text-xs font-bold text-slate-700 hover:text-rose-600 transition shadow-2xs cursor-pointer"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span>Log Out</span>
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={() => router.push(`/play/${capacity.roomId}`)}
+              className="w-full py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs uppercase tracking-wider transition shadow-sm flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <span>Resume Quiz as {activeSession.teamName}</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+
         <form onSubmit={handleJoin} className="space-y-4">
           {/* Room Code or ID */}
           <div>
@@ -233,50 +371,6 @@ function JoinForm() {
                 className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-11 pr-4 py-3 text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 text-sm font-medium transition-all shadow-2xs"
               />
             </div>
-          </div>
-
-          {/* Members List */}
-          <div>
-            <label className="block text-[11px] font-bold uppercase tracking-[0.15em] text-slate-500 mb-1.5">
-              Members <span className="text-slate-400 normal-case">(optional)</span>
-            </label>
-            <div className="flex gap-2 mb-2">
-              <input
-                type="text"
-                value={memberName}
-                onChange={(e) => setMemberName(e.target.value)}
-                onKeyDown={handleKeyDownMember}
-                placeholder="Player name"
-                className="flex-1 bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-2.5 text-xs text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-blue-500 shadow-2xs"
-              />
-              <button
-                type="button"
-                onClick={handleAddMember}
-                className="px-3.5 py-2.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition shadow-2xs"
-              >
-                <Plus className="w-3.5 h-3.5" />
-              </button>
-            </div>
-
-            {members.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 mt-2">
-                {members.map((m, idx) => (
-                  <span
-                    key={idx}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-blue-50 text-xs font-medium text-blue-700 border border-blue-200"
-                  >
-                    <span>{m}</span>
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveMember(idx)}
-                      className="hover:text-rose-500 p-0.5"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
           </div>
 
           <button

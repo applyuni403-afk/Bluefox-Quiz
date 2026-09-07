@@ -105,13 +105,15 @@ export async function createRoom(name: string): Promise<Room> {
 export async function joinRoom(
   codeOrId: string,
   groupName: string,
-  rawMembers: string[] = []
+  rawMembers: string[] = [],
+  clientClaimToken?: string | null
 ): Promise<{
   success: boolean;
   roomId?: string;
   contestantId?: string;
   groupName?: string;
   joinOrder?: number;
+  claimToken?: string;
   error?: string;
   reconnected?: boolean;
 }> {
@@ -124,10 +126,14 @@ export async function joinRoom(
     }
 
     const cleanGroupName = groupName.trim();
+    if (!cleanGroupName) {
+      return { success: false, error: 'Please enter a valid team name.' };
+    }
+
     const contestants = await getContestantsCollection();
     const escapedGroup = cleanGroupName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-    // Check if this group already exists in the room (Reconnect support with case-insensitive match)
+    // Check if this group already exists in the room
     const existingGroup = await contestants.findOne({
       roomId: { $in: [room.id, room.code] },
       kind: 'group',
@@ -135,12 +141,46 @@ export async function joinRoom(
     });
 
     if (existingGroup) {
+      // Check device session locking
+      if (existingGroup.claimToken) {
+        // If client sends matching token, allow reconnect seamlessly
+        if (clientClaimToken && clientClaimToken === existingGroup.claimToken) {
+          await contestants.updateOne(
+            { id: existingGroup.id },
+            { $set: { lastActiveAt: new Date() } }
+          );
+          return {
+            success: true,
+            roomId: room.id,
+            contestantId: existingGroup.id,
+            groupName: existingGroup.name,
+            joinOrder: existingGroup.joinOrder,
+            claimToken: existingGroup.claimToken,
+            reconnected: true,
+          };
+        }
+
+        // Another device is already holding this team session!
+        return {
+          success: false,
+          error: `Team "${existingGroup.name}" is already active on another device. Please log out from that device to switch.`,
+        };
+      }
+
+      // If team exists but has no active claim token (e.g. host added or previously logged out), claim it
+      const newClaimToken = crypto.randomUUID();
+      await contestants.updateOne(
+        { id: existingGroup.id },
+        { $set: { claimToken: newClaimToken, lastActiveAt: new Date() } }
+      );
+
       return {
         success: true,
         roomId: room.id,
         contestantId: existingGroup.id,
         groupName: existingGroup.name,
         joinOrder: existingGroup.joinOrder,
+        claimToken: newClaimToken,
         reconnected: true,
       };
     }
@@ -166,6 +206,7 @@ export async function joinRoom(
       .filter((m) => m.length > 0);
 
     const id = crypto.randomUUID();
+    const claimToken = crypto.randomUUID();
     const newContestant: Contestant = {
       id,
       _id: id,
@@ -176,6 +217,8 @@ export async function joinRoom(
       members,
       score: 0,
       joinOrder: existingGroups.length + 1,
+      claimToken,
+      lastActiveAt: new Date(),
       createdAt: new Date(),
     };
 
@@ -191,10 +234,44 @@ export async function joinRoom(
       contestantId: newContestant.id,
       groupName: newContestant.name,
       joinOrder: newContestant.joinOrder,
+      claimToken,
     };
   } catch (err) {
     console.error('joinRoom action error:', err);
     return { success: false, error: (err as Error).message || 'Failed to join room' };
+  }
+}
+
+export async function logoutContestant(
+  roomId: string,
+  contestantId: string,
+  claimToken?: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const room = await resolveRoom(roomId);
+    if (!room) return { success: false, error: 'Room not found' };
+
+    const contestants = await getContestantsCollection();
+    const contestant = await contestants.findOne({
+      id: contestantId,
+      roomId: { $in: [room.id, room.code] },
+    });
+
+    if (!contestant) return { success: false, error: 'Team not found' };
+
+    // Release the claim token so another device or session can take over
+    await contestants.updateOne(
+      { id: contestantId },
+      { $set: { claimToken: null, lastActiveAt: null } }
+    );
+
+    const rooms = await getRoomsCollection();
+    await rooms.updateOne({ id: room.id }, { $inc: { version: 1 } });
+
+    return { success: true };
+  } catch (err) {
+    console.error('logoutContestant error:', err);
+    return { success: false, error: (err as Error).message || 'Failed to logout team' };
   }
 }
 
@@ -545,31 +622,48 @@ export async function setRoomTimerDefault(roomId: string, seconds: number) {
   );
 }
 
-export async function markCorrect(roomId: string) {
+export async function markCorrect(
+  roomId: string,
+  targetContestantId?: string
+): Promise<{
+  success: boolean;
+  pointsAwarded?: number;
+  contestantName?: string;
+  error?: string;
+}> {
   await assertAdmin();
 
   const room = await resolveRoom(roomId);
-  if (!room || !room.currentQuestionId || !room.activeContestantId) {
-    return;
+  if (!room || !room.currentQuestionId) {
+    return { success: false, error: 'No active question found' };
   }
   const canonicalId = room.id;
 
   const questions = await getQuestionsCollection();
   const question = await questions.findOne({ id: room.currentQuestionId });
-  if (!question) return;
+  if (!question) {
+    return { success: false, error: 'Question not found' };
+  }
 
   const contestants = await getContestantsCollection();
-  const contestant = await contestants.findOne({ id: room.activeContestantId });
-  if (!contestant) return;
+  const recipientId = targetContestantId || room.activeContestantId;
+  if (!recipientId) {
+    return { success: false, error: 'No active contestant to award points' };
+  }
 
-  // Award points
+  const contestant = await contestants.findOne({ id: recipientId });
+  if (!contestant) {
+    return { success: false, error: 'Contestant not found' };
+  }
+
+  // Award points: auto add question.points
   const points = question.points ?? 10;
   await contestants.updateOne(
     { id: contestant.id },
     { $set: { score: contestant.score + points } }
   );
 
-  // If this contestant is an individual in rapid fire, award points to parent group directly too!
+  // If this contestant is an individual in rapid fire, award points to parent group directly too
   if (contestant.kind === 'individual' && contestant.parentGroupId) {
     await contestants.updateOne(
       { id: contestant.parentGroupId },
@@ -595,6 +689,12 @@ export async function markCorrect(roomId: string) {
       $inc: { version: 1 },
     }
   );
+
+  return {
+    success: true,
+    pointsAwarded: points,
+    contestantName: contestant.name,
+  };
 }
 
 export async function markWrong(roomId: string) {

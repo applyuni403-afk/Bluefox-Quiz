@@ -25,9 +25,7 @@ import {
   nextTurn,
   closeQuestion,
   startRapidFireForGroup,
-  startRapidFireForIndividual,
   chooseRapidFireQuestion,
-  creditIndividualToGroup,
   getRoomQuestions,
   logoutAdminAction,
 } from '@/lib/actions';
@@ -70,7 +68,6 @@ export function AdminRoomClient({ roomId }: AdminRoomClientProps) {
   const [copied, setCopied] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [selectedParentGroupId, setSelectedParentGroupId] = useState('');
-  const [selectedMemberName, setSelectedMemberName] = useState('');
   const [isActionPending, setIsActionPending] = useState(false);
 
   // 00:00 Auto-Pass Single Authority
@@ -183,17 +180,11 @@ export function AdminRoomClient({ roomId }: AdminRoomClientProps) {
   }
 
   const groups = contestants.filter((c) => c.kind === 'group');
-  const individuals = contestants.filter((c) => c.kind === 'individual');
   const activeContestant = contestants.find((c) => c.id === room.activeContestantId);
 
   const activeHostQuestion = allQuestions.find(
     (q) => q.id === room.currentQuestionId
   );
-
-  const selectedGroup = groups.find((g) => g.id === selectedParentGroupId);
-  const availableMembers = Array.isArray(selectedGroup?.members)
-    ? selectedGroup!.members
-    : [];
 
   return (
     <div className="min-h-screen bg-[#edf2f9] text-slate-800 flex flex-col justify-between selection:bg-blue-500/20">
@@ -399,101 +390,56 @@ export function AdminRoomClient({ roomId }: AdminRoomClientProps) {
             </div>
           </div>
 
-          {/* Rapid Fire Player Selector (Visible in rapid_fire mode) */}
+          {/* Rapid Fire Team Selector (Visible in rapid_fire mode) */}
           {room.roundType === 'rapid_fire' && (
             <div className="bg-white/85 backdrop-blur-2xl border border-amber-200 rounded-3xl p-5 sm:p-6 space-y-4 shadow-[0_10px_30px_rgba(245,158,11,0.05)]">
               <div className="flex items-center gap-2">
                 <Flame className="w-4 h-4 text-amber-500" />
                 <h3 className="font-bold text-sm uppercase tracking-wider text-amber-800">
-                  Assign Rapid-Fire Player
+                  Activate Rapid-Fire Team
                 </h3>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
+              <div className="flex flex-col sm:flex-row gap-3 items-center">
+                <div className="flex-1 w-full">
                   <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">
-                    Group:
+                    Select Team:
                   </label>
                   <select
                     value={selectedParentGroupId}
-                    onChange={(e) => {
-                      setSelectedParentGroupId(e.target.value);
-                      setSelectedMemberName('');
-                    }}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-amber-500"
+                    onChange={(e) => setSelectedParentGroupId(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-amber-500 font-medium"
                   >
-                    <option value="">-- Choose Team --</option>
+                    <option value="">-- Choose Team to Play Rapid Fire --</option>
                     {groups.map((g) => (
                       <option key={g.id} value={g.id}>
-                        {g.name}
+                        {g.name} ({g.score} PTS)
                       </option>
                     ))}
                   </select>
                 </div>
 
-                <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">
-                    Player:
-                  </label>
-                  {availableMembers.length > 0 ? (
-                    <select
-                      value={selectedMemberName}
-                      onChange={(e) => setSelectedMemberName(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-amber-500"
-                    >
-                      <option value="">-- Choose Member --</option>
-                      {availableMembers.map((m, idx) => (
-                        <option key={idx} value={m}>
-                          {m}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <input
-                      type="text"
-                      value={selectedMemberName}
-                      onChange={(e) => setSelectedMemberName(e.target.value)}
-                      placeholder="Player Name"
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-amber-500"
-                    />
-                  )}
-                </div>
-
-                <div className="flex items-end">
+                <div className="w-full sm:w-auto self-end">
                   <button
                     type="button"
                     disabled={!selectedParentGroupId || isActionPending}
                     onClick={() =>
-                      wrapAction(() =>
-                        selectedMemberName
-                          ? startRapidFireForIndividual(room.id, selectedParentGroupId, selectedMemberName)
-                          : startRapidFireForGroup(room.id, selectedParentGroupId)
-                      )
+                      wrapAction(async () => {
+                        await startRapidFireForGroup(room.id, selectedParentGroupId);
+                        const activated = groups.find((g) => g.id === selectedParentGroupId);
+                        toast.success(
+                          'Rapid Fire Activated',
+                          `Turn granted to "${activated?.name || 'Selected Team'}".`
+                        );
+                      })
                     }
-                    className="w-full py-2 px-3 rounded-xl text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white transition disabled:opacity-40 shadow-xs cursor-pointer"
+                    className="w-full sm:w-auto py-2.5 px-5 rounded-xl text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white transition disabled:opacity-40 shadow-xs cursor-pointer flex items-center justify-center gap-1.5"
                   >
-                    {selectedMemberName ? 'Activate Player' : 'Activate Team'}
+                    <Flame className="w-3.5 h-3.5" />
+                    <span>Activate Team</span>
                   </button>
                 </div>
               </div>
-
-              {/* Credit button for individual points */}
-              {individuals.length > 0 && (
-                <div className="pt-2 border-t border-slate-100 flex flex-wrap gap-2 items-center">
-                  <span className="text-xs text-slate-500 font-semibold">Credit to Team:</span>
-                  {individuals.map((ind) => (
-                    <button
-                      key={ind.id}
-                      type="button"
-                      disabled={ind.score <= 0 || isActionPending}
-                      onClick={() => wrapAction(() => creditIndividualToGroup(room.id, ind.id))}
-                      className="px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 disabled:opacity-30"
-                    >
-                      {ind.name} ({ind.score} pts) &rarr; Team
-                    </button>
-                  ))}
-                </div>
-              )}
             </div>
           )}
 
@@ -520,53 +466,116 @@ export function AdminRoomClient({ roomId }: AdminRoomClientProps) {
                 <QuestionCard question={activeHostQuestion} />
 
                 {/* Host Answer Hint Bar */}
-                <div className="p-3.5 rounded-2xl bg-indigo-50 border border-indigo-200 flex items-center justify-between text-xs">
-                  <span className="font-bold text-indigo-900">Answer Key:</span>
-                  <span className="font-mono font-black text-indigo-900 text-sm bg-white px-3 py-1 rounded-xl border border-indigo-200 shadow-2xs">
-                    {activeHostQuestion.correctAnswer}
-                  </span>
+                <div className="p-3.5 rounded-2xl bg-indigo-50 border border-indigo-200 flex flex-wrap items-center justify-between gap-3 text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-indigo-900">Answer Key:</span>
+                    <span className="font-mono font-black text-indigo-900 text-sm bg-white px-3 py-1 rounded-xl border border-indigo-200 shadow-2xs">
+                      {activeHostQuestion.correctAnswer}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-slate-500 font-semibold">Active Turn:</span>
+                    <span className="font-bold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-xl border border-blue-200">
+                      {activeContestant?.name || 'No team selected'}
+                      {room.passCount > 0 ? ` (Pass #${room.passCount})` : ''}
+                    </span>
+                    <span className="font-black text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-xl border border-emerald-200">
+                      +{activeHostQuestion.points} PTS
+                    </span>
+                  </div>
                 </div>
 
                 {/* Evaluation Action Buttons */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-2">
-                  <button
-                    type="button"
-                    disabled={isActionPending}
-                    onClick={() => wrapAction(() => markCorrect(room.id))}
-                    className="py-3 px-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 font-bold text-xs uppercase tracking-wider text-white shadow-md shadow-emerald-500/20 transition active:scale-95 flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer"
-                  >
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>Correct (+{activeHostQuestion.points})</span>
-                  </button>
+                <div className="space-y-2.5 pt-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                    <button
+                      type="button"
+                      disabled={isActionPending || !activeContestant}
+                      onClick={() =>
+                        wrapAction(async () => {
+                          const res = await markCorrect(room.id);
+                          if (res?.success) {
+                            toast.success(
+                              'Points Awarded!',
+                              `+${res.pointsAwarded} PTS auto-added to "${
+                                res.contestantName || activeContestant?.name
+                              }".`
+                            );
+                          }
+                        })
+                      }
+                      className="py-3 px-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 font-bold text-xs uppercase tracking-wider text-white shadow-md shadow-emerald-500/20 transition active:scale-95 flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                    >
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span className="truncate">Correct (+{activeHostQuestion.points})</span>
+                    </button>
 
-                  <button
-                    type="button"
-                    disabled={isActionPending}
-                    onClick={() => wrapAction(() => markWrong(room.id))}
-                    className="py-3 px-3 rounded-2xl bg-rose-600 hover:bg-rose-700 font-bold text-xs uppercase tracking-wider text-white shadow-md shadow-rose-500/20 transition active:scale-95 flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer"
-                  >
-                    <XCircle className="w-4 h-4" />
-                    <span>Wrong</span>
-                  </button>
+                    <button
+                      type="button"
+                      disabled={isActionPending}
+                      onClick={() => wrapAction(() => markWrong(room.id))}
+                      className="py-3 px-3 rounded-2xl bg-rose-600 hover:bg-rose-700 font-bold text-xs uppercase tracking-wider text-white shadow-md shadow-rose-500/20 transition active:scale-95 flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                    >
+                      <XCircle className="w-4 h-4" />
+                      <span>Wrong</span>
+                    </button>
 
-                  <button
-                    type="button"
-                    disabled={isActionPending}
-                    onClick={() => wrapAction(() => passQuestion(room.id))}
-                    className="py-3 px-3 rounded-2xl bg-blue-600 hover:bg-blue-700 font-bold text-xs uppercase tracking-wider text-white shadow-md shadow-blue-500/20 transition active:scale-95 flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer"
-                  >
-                    <SkipForward className="w-4 h-4" />
-                    <span>Pass Turn</span>
-                  </button>
+                    <button
+                      type="button"
+                      disabled={isActionPending}
+                      onClick={() => wrapAction(() => passQuestion(room.id))}
+                      className="py-3 px-3 rounded-2xl bg-blue-600 hover:bg-blue-700 font-bold text-xs uppercase tracking-wider text-white shadow-md shadow-blue-500/20 transition active:scale-95 flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                    >
+                      <SkipForward className="w-4 h-4" />
+                      <span>Pass Turn</span>
+                    </button>
 
-                  <button
-                    type="button"
-                    disabled={isActionPending}
-                    onClick={() => wrapAction(() => closeQuestion(room.id))}
-                    className="py-3 px-3 rounded-2xl bg-slate-100 hover:bg-slate-200 font-bold text-xs uppercase tracking-wider text-slate-700 border border-slate-200 transition active:scale-95 flex items-center justify-center disabled:opacity-50 cursor-pointer"
-                  >
-                    <span>Done</span>
-                  </button>
+                    <button
+                      type="button"
+                      disabled={isActionPending}
+                      onClick={() => wrapAction(() => closeQuestion(room.id))}
+                      className="py-3 px-3 rounded-2xl bg-slate-100 hover:bg-slate-200 font-bold text-xs uppercase tracking-wider text-slate-700 border border-slate-200 transition active:scale-95 flex items-center justify-center disabled:opacity-50 cursor-pointer"
+                    >
+                      <span>Done</span>
+                    </button>
+                  </div>
+
+                  {/* Direct Question Points Award to Another Team (if answered out of turn) */}
+                  {groups.length > 1 && (
+                    <div className="flex flex-wrap items-center gap-2 p-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs">
+                      <span className="text-[11px] font-bold text-slate-500 shrink-0">
+                        Award +{activeHostQuestion.points} to another team:
+                      </span>
+                      <select
+                        defaultValue=""
+                        disabled={isActionPending}
+                        onChange={(e) => {
+                          const targetId = e.target.value;
+                          if (!targetId) return;
+                          e.target.value = '';
+                          wrapAction(async () => {
+                            const res = await markCorrect(room.id, targetId);
+                            if (res?.success) {
+                              toast.success(
+                                'Points Awarded!',
+                                `+${res.pointsAwarded} PTS auto-added to "${res.contestantName}".`
+                              );
+                            }
+                          });
+                        }}
+                        className="flex-1 bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-emerald-500 cursor-pointer"
+                      >
+                        <option value="">-- Choose Team to Receive +{activeHostQuestion.points} PTS --</option>
+                        {groups
+                          .filter((g) => g.id !== activeContestant?.id)
+                          .map((g) => (
+                            <option key={g.id} value={g.id}>
+                              {g.name} ({g.score} PTS)
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+                  )}
                 </div>
               </div>
             ) : (

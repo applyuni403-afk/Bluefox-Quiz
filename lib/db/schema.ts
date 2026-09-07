@@ -25,6 +25,8 @@ export interface Contestant {
   members: string[];
   score: number;
   joinOrder: number; // 1..8, drives pass rotation
+  claimToken?: string | null; // unique token for device locking
+  lastActiveAt?: Date | null;
   createdAt: Date;
 }
 

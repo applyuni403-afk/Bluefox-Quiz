@@ -2,6 +2,7 @@
 
 import { use, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useGameState } from '@/lib/useGameState';
 import { useTimer } from '@/lib/useTimer';
 import { Timer } from '@/components/Timer';
@@ -11,6 +12,7 @@ import { RapidFireBoard } from '@/components/RapidFireBoard';
 import { SoundPlayer } from '@/components/SoundPlayer';
 import { SiteLogo } from '@/components/SiteLogo';
 import { useNotification } from '@/context/NotificationContext';
+import { logoutContestant } from '@/lib/actions';
 import {
   Users,
   SkipForward,
@@ -19,6 +21,8 @@ import {
   Clock,
   Crown,
   UserX,
+  LogOut,
+  CheckCircle2,
 } from 'lucide-react';
 
 export default function PlayRoomPage({
@@ -27,43 +31,113 @@ export default function PlayRoomPage({
   params: Promise<{ roomId: string }>;
 }) {
   const { roomId } = use(params);
-  const { toast } = useNotification();
+  const router = useRouter();
+  const { toast, confirm } = useNotification();
   const { room, contestants, question, board, error, isLoading, mutate } =
     useGameState(roomId);
 
   const [myContestantId, setMyContestantId] = useState<string | null>(null);
+  const [myClaimToken, setMyClaimToken] = useState<string | null>(null);
   const [passing, setPassing] = useState(false);
   const [passError, setPassError] = useState('');
 
-  // Read stored contestant id from localStorage
+  // Read stored contestant id and claim token from localStorage & cookie
   useEffect(() => {
-    const stored =
-      localStorage.getItem(`bluefox_contestant_${roomId}`) ||
-      (room?.id ? localStorage.getItem(`bluefox_contestant_${room.id}`) : null) ||
-      (room?.code ? localStorage.getItem(`bluefox_contestant_${room.code}`) : null) ||
-      localStorage.getItem('bluefox_last_contestant_id');
-    if (stored) {
-      const timer = setTimeout(() => setMyContestantId(stored), 0);
+    const keys = [roomId, room?.id, room?.code].filter(Boolean) as string[];
+    let foundId: string | null = null;
+    let foundToken: string | null = null;
+
+    for (const k of keys) {
+      const localId = localStorage.getItem(`bluefox_contestant_${k}`);
+      const localToken = localStorage.getItem(`bluefox_claim_token_${k}`);
+      if (localId) {
+        foundId = localId;
+        foundToken = localToken;
+        break;
+      }
+      const match = document.cookie.match(new RegExp(`(?:^|; )bluefox_team_${k}=([^;]*)`));
+      if (match && match[1]) {
+        try {
+          const data = JSON.parse(decodeURIComponent(match[1]));
+          if (data.id) {
+            foundId = data.id;
+            foundToken = data.token || null;
+            break;
+          }
+        } catch {
+          // ignore
+        }
+      }
+    }
+
+    if (!foundId) {
+      foundId = localStorage.getItem('bluefox_last_contestant_id');
+      foundToken = localStorage.getItem('bluefox_last_claim_token');
+    }
+
+    if (foundId) {
+      const timer = setTimeout(() => {
+        setMyContestantId(foundId);
+        setMyClaimToken(foundToken);
+      }, 0);
       return () => clearTimeout(timer);
     }
   }, [roomId, room?.id, room?.code]);
 
   const activeContestant = contestants.find((c) => c.id === room?.activeContestantId);
-  const myContestant = contestants.find(
-    (c) => c.id === myContestantId || (myContestantId && c.parentGroupId === myContestantId)
-  );
+  const myContestant = contestants.find((c) => c.id === myContestantId);
   const isMyTurn = Boolean(
     myContestantId &&
       room?.activeContestantId &&
-      (myContestantId === room.activeContestantId ||
-        activeContestant?.parentGroupId === myContestantId ||
-        (myContestant?.parentGroupId && myContestant.parentGroupId === room.activeContestantId))
+      myContestantId === room.activeContestantId
   );
 
-  // Check if this player was kicked by host
+  // Check if this team was kicked by host
   const wasKicked = Boolean(myContestantId && contestants.length > 0 && !myContestant);
 
   const { isRunning: isTimerRunning } = useTimer(room?.timerEndsAt);
+
+  // Contestant explicit LOG OUT action
+  const handleLogoutTeam = async () => {
+    if (!myContestant) return;
+    const confirmed = await confirm({
+      title: `Log Out Team "${myContestant.name}"?`,
+      message:
+        'This will release the team session so another device can log in or you can choose a different team.',
+      confirmText: 'Log Out Team',
+      cancelText: 'Stay Connected',
+      variant: 'warning',
+      icon: 'logout',
+    });
+    if (!confirmed) return;
+
+    try {
+      await logoutContestant(
+        room?.id || roomId,
+        myContestant.id,
+        myClaimToken || undefined
+      );
+
+      // Clear local storage and cookie
+      const keys = Array.from(
+        new Set([roomId, room?.id, room?.code, localStorage.getItem('bluefox_last_room_id')].filter(Boolean))
+      ) as string[];
+
+      keys.forEach((k) => {
+        localStorage.removeItem(`bluefox_contestant_${k}`);
+        localStorage.removeItem(`bluefox_claim_token_${k}`);
+        localStorage.removeItem(`bluefox_team_name_${k}`);
+        document.cookie = `bluefox_team_${k}=; path=/; max-age=0; SameSite=Lax`;
+      });
+      localStorage.removeItem('bluefox_last_contestant_id');
+      localStorage.removeItem('bluefox_last_claim_token');
+
+      toast.info('Logged Out', `Logged out of team "${myContestant.name}".`);
+      router.push('/join');
+    } catch (err) {
+      toast.error('Logout Failed', (err as Error).message);
+    }
+  };
 
   // Contestant PASS action
   const handlePass = async () => {
@@ -195,13 +269,26 @@ export default function PlayRoomPage({
             </div>
           </div>
 
-          <div className="bg-white/85 backdrop-blur-xl border border-blue-100 px-4 py-2 rounded-2xl text-right shadow-xs">
-            <span className="text-[9px] uppercase font-bold text-slate-500 block tracking-[0.15em]">
-              Room Code
-            </span>
-            <span className="font-mono text-xl font-black text-blue-600 tracking-wider">
-              {room.code}
-            </span>
+          <div className="flex items-center gap-2">
+            <div className="bg-white/85 backdrop-blur-xl border border-blue-100 px-4 py-2 rounded-2xl text-right shadow-xs">
+              <span className="text-[9px] uppercase font-bold text-slate-500 block tracking-[0.15em]">
+                Room Code
+              </span>
+              <span className="font-mono text-xl font-black text-blue-600 tracking-wider">
+                {room.code}
+              </span>
+            </div>
+            {myContestant && (
+              <button
+                type="button"
+                onClick={handleLogoutTeam}
+                title="Log out from this team"
+                className="px-3 py-2 rounded-2xl bg-white hover:bg-rose-50 border border-blue-100 hover:border-rose-200 text-slate-600 hover:text-rose-600 transition shadow-xs flex items-center gap-1.5 text-xs font-bold cursor-pointer"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Log Out</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -257,13 +344,10 @@ export default function PlayRoomPage({
                         <h3 className="font-extrabold text-base text-slate-900 truncate mb-1">
                           {group.name}
                         </h3>
-                        {Array.isArray(group.members) && group.members.length > 0 ? (
-                          <p className="text-[11px] text-slate-600 line-clamp-2">
-                            {group.members.join(', ')}
-                          </p>
-                        ) : (
-                          <p className="text-[11px] text-slate-400 italic">Ready</p>
-                        )}
+                        <div className="flex items-center gap-1.5 text-[11px] text-emerald-600 font-semibold">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                          <span>Ready to Play</span>
+                        </div>
                       </div>
                     );
                   })}
@@ -364,22 +448,36 @@ export default function PlayRoomPage({
             </div>
           </div>
 
-          {/* Active Turn Badge */}
-          <div
-            className={`px-4 py-2 rounded-2xl border flex items-center gap-2.5 transition-all ${
-              isMyTurn
-                ? 'bg-gradient-to-r from-blue-600 to-indigo-600 border-blue-400 text-white shadow-[0_0_20px_rgba(59,130,246,0.3)] animate-pulse'
-                : 'bg-white border-blue-100 text-slate-700 shadow-xs'
-            }`}
-          >
-            <Sparkles className="w-4 h-4 text-current shrink-0" />
-            <div>
-              <span className="text-[9px] uppercase font-black tracking-[0.15em] opacity-80 block">
-                {isMyTurn ? "IT'S YOUR TURN!" : 'Active Turn'}
-              </span>
-              <span className="font-bold text-xs sm:text-sm">
-                {activeContestant?.name || 'Awaiting question...'}
-              </span>
+          <div className="flex items-center gap-3">
+            {myContestant && (
+              <button
+                type="button"
+                onClick={handleLogoutTeam}
+                title="Log out from team"
+                className="px-3 py-2 rounded-2xl bg-white hover:bg-rose-50 border border-blue-100 hover:border-rose-200 text-slate-600 hover:text-rose-600 transition shadow-xs flex items-center gap-1.5 text-xs font-bold cursor-pointer"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Log Out Team</span>
+              </button>
+            )}
+
+            {/* Active Turn Badge */}
+            <div
+              className={`px-4 py-2 rounded-2xl border flex items-center gap-2.5 transition-all ${
+                isMyTurn
+                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600 border-blue-400 text-white shadow-[0_0_20px_rgba(59,130,246,0.3)] animate-pulse'
+                  : 'bg-white border-blue-100 text-slate-700 shadow-xs'
+              }`}
+            >
+              <Sparkles className="w-4 h-4 text-current shrink-0" />
+              <div>
+                <span className="text-[9px] uppercase font-black tracking-[0.15em] opacity-80 block">
+                  {isMyTurn ? "IT'S YOUR TURN!" : 'Active Turn'}
+                </span>
+                <span className="font-bold text-xs sm:text-sm">
+                  {activeContestant?.name || 'Awaiting question...'}
+                </span>
+              </div>
             </div>
           </div>
         </div>

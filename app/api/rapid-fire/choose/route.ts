@@ -34,7 +34,7 @@ export async function POST(request: Request) {
     if (!isAdmin) {
       if (!contestantId) {
         return NextResponse.json(
-          { error: 'Only the active rapid-fire team or player may choose a question' },
+          { error: 'Only the active rapid-fire team may choose a question' },
           { status: 403 }
         );
       }
@@ -44,7 +44,7 @@ export async function POST(request: Request) {
 
       if (!activeId) {
         return NextResponse.json(
-          { error: 'No contestant is currently active' },
+          { error: 'No team is currently active' },
           { status: 400 }
         );
       }
@@ -66,7 +66,7 @@ export async function POST(request: Request) {
 
       if (!isAllowed) {
         return NextResponse.json(
-          { error: 'Only the active rapid-fire team or player may choose a question' },
+          { error: 'Only the active rapid-fire team may choose a question' },
           { status: 403 }
         );
       }
