@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Shield, KeyRound, ArrowRight, PlusCircle, Sparkles, ChevronLeft, Lock } from 'lucide-react';
 import { authenticateAdmin, createRoom } from '@/lib/actions';
+import { SiteLogo } from '@/components/SiteLogo';
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -67,11 +68,7 @@ export default function AdminLoginPage() {
       <div className="w-full max-w-md z-10">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="w-16 h-16 rounded-3xl bg-gradient-to-br from-indigo-500 via-blue-600 to-slate-900 p-[1px] shadow-2xl shadow-indigo-500/20 mx-auto mb-4">
-            <div className="w-full h-full bg-[#0b0e14] rounded-[23px] flex items-center justify-center text-3xl">
-              🦊
-            </div>
-          </div>
+          <SiteLogo size="lg" className="mx-auto mb-4" />
           <h1 className="text-2xl font-black tracking-tight text-white">
             {isAuthenticated ? 'Create Quiz Room' : 'Host Portal'}
           </h1>

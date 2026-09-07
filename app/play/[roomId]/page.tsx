@@ -9,6 +9,7 @@ import { QuestionCard } from '@/components/QuestionCard';
 import { ScoreBoard } from '@/components/ScoreBoard';
 import { RapidFireBoard } from '@/components/RapidFireBoard';
 import { SoundPlayer } from '@/components/SoundPlayer';
+import { SiteLogo } from '@/components/SiteLogo';
 import {
   Users,
   SkipForward,
@@ -169,11 +170,7 @@ export default function PlayRoomPage({
         {/* Header */}
         <div className="w-full max-w-4xl flex items-center justify-between pb-6 border-b border-white/[0.06] z-10">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-500 to-blue-600 p-[1px] shadow-lg shadow-indigo-500/20">
-              <div className="w-full h-full bg-[#0b0e14] rounded-[15px] flex items-center justify-center text-xl">
-                🦊
-              </div>
-            </div>
+            <SiteLogo size="md" />
             <div>
               <h1 className="font-black text-xl tracking-tight text-white">{room.name}</h1>
               <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-400">
@@ -337,11 +334,7 @@ export default function PlayRoomPage({
       <header className="border-b border-white/[0.06] px-4 sm:px-8 py-3.5 bg-[#07090e]/90 backdrop-blur-2xl sticky top-0 z-40">
         <div className="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 to-blue-600 p-[1px] shadow-lg shadow-indigo-500/20">
-              <div className="w-full h-full bg-[#0b0e14] rounded-[11px] flex items-center justify-center text-sm">
-                🦊
-              </div>
-            </div>
+            <SiteLogo size="sm" />
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="font-black text-sm sm:text-base text-white truncate max-w-xs">{room.name}</h1>

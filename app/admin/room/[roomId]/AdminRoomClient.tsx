@@ -48,6 +48,7 @@ import {
   Radio,
 } from 'lucide-react';
 import useSWR from 'swr';
+import { SiteLogo } from '@/components/SiteLogo';
 
 interface AdminRoomClientProps {
   roomId: string;
@@ -169,11 +170,7 @@ export function AdminRoomClient({ roomId }: AdminRoomClientProps) {
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
           {/* Left Brand & Room Pill */}
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-2xl bg-gradient-to-br from-indigo-500 to-blue-600 p-[1px] shadow-lg shadow-indigo-500/20">
-              <div className="w-full h-full bg-[#0b0e14] rounded-[15px] flex items-center justify-center text-lg">
-                🦊
-              </div>
-            </div>
+            <SiteLogo size="sm" />
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="font-black text-base text-white truncate max-w-[200px] sm:max-w-xs">{room.name}</h1>

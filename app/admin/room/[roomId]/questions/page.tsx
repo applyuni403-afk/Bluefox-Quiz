@@ -1,6 +1,11 @@
+import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { checkIsAdmin } from '@/lib/session';
 import { QuestionsClient } from './QuestionsClient';
+
+export const metadata: Metadata = {
+  title: 'Question Bank',
+};
 
 export default async function AdminQuestionsPage({
   params,

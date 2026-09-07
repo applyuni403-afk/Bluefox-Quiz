@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { Play, Shield, ArrowRight, Zap, Trophy, Flame, Sparkles } from 'lucide-react';
+import { SiteLogo } from '@/components/SiteLogo';
 
 export default function Home() {
   return (
@@ -12,11 +13,7 @@ export default function Home() {
       <header className="border-b border-white/[0.06] backdrop-blur-xl sticky top-0 z-50 px-6 py-4">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-500 to-blue-600 p-[1px] shadow-lg shadow-indigo-500/20">
-              <div className="w-full h-full bg-[#0b0e14] rounded-[15px] flex items-center justify-center text-xl">
-                🦊
-              </div>
-            </div>
+            <SiteLogo size="md" />
             <span className="font-black text-lg tracking-tight text-white flex items-center gap-1.5">
               BLUEFOX <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">ARENA</span>
             </span>

@@ -6,6 +6,7 @@ import Link from 'next/link';
 import useSWR from 'swr';
 import { Play, Users, Plus, X, ArrowRight, ShieldAlert, CheckCircle, RefreshCw, ChevronLeft } from 'lucide-react';
 import { joinRoom, checkRoomCapacity } from '@/lib/actions';
+import { SiteLogo } from '@/components/SiteLogo';
 
 function JoinForm() {
   const router = useRouter();
@@ -252,11 +253,7 @@ export default function JoinPage() {
       <div className="w-full max-w-md z-10">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="w-16 h-16 rounded-3xl bg-gradient-to-br from-blue-500 via-indigo-600 to-slate-900 p-[1px] shadow-2xl shadow-blue-500/20 mx-auto mb-4">
-            <div className="w-full h-full bg-[#0b0e14] rounded-[23px] flex items-center justify-center text-3xl">
-              🦊
-            </div>
-          </div>
+          <SiteLogo size="lg" className="mx-auto mb-4" />
           <h1 className="text-2xl font-black tracking-tight text-white">Join Quiz Arena</h1>
           <p className="text-xs text-zinc-400 mt-1 font-medium">
             Enter 6-digit room code to join the live session
