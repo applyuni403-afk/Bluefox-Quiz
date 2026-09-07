@@ -109,6 +109,27 @@ export default function Home() {
             <Trophy className="w-3.5 h-3.5 text-emerald-500" /> Realtime Leaderboard
           </span>
         </div>
+
+        {/* Support Team */}
+        <div className="mt-8 flex items-center justify-center">
+          <div className="inline-flex flex-wrap items-center justify-center gap-2 px-4 py-2 rounded-2xl bg-white/85 backdrop-blur-xl border border-blue-100/90 shadow-2xs text-xs text-slate-600">
+            <span className="font-bold text-slate-700">Support Team:</span>
+            <span>📞</span>
+            <a
+              href="tel:+9779742290123"
+              className="font-medium text-slate-700 hover:text-blue-600 transition-colors"
+            >
+              +977-9742290123
+            </a>
+            <span className="text-slate-300 font-bold">|</span>
+            <a
+              href="tel:9825929601"
+              className="font-medium text-slate-700 hover:text-blue-600 transition-colors"
+            >
+              9825929601
+            </a>
+          </div>
+        </div>
       </main>
 
       {/* Clean Minimal Footer */}
