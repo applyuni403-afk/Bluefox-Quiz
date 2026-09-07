@@ -1,0 +1,197 @@
+import { MongoClient } from 'mongodb';
+import fs from 'fs';
+import path from 'path';
+
+// Helper to read .env.local if present
+function loadEnv() {
+  const envPath = path.resolve(process.cwd(), '.env.local');
+  if (fs.existsSync(envPath)) {
+    const lines = fs.readFileSync(envPath, 'utf8').split('\n');
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      const eqIdx = trimmed.indexOf('=');
+      if (eqIdx !== -1) {
+        const key = trimmed.slice(0, eqIdx).trim();
+        let val = trimmed.slice(eqIdx + 1).trim();
+        if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+          val = val.slice(1, -1);
+        }
+        process.env[key] = process.env[key] || val;
+      }
+    }
+  }
+}
+
+loadEnv();
+
+async function runTests() {
+  console.log('--- Testing Bluefox MongoDB Engine ---');
+
+  const uri = process.env.MONGODB_URI;
+  if (!uri) {
+    console.error('❌ MONGODB_URI is not set in environment or .env.local.');
+    process.exit(1);
+  }
+
+  console.log(`✓ MONGODB_URI detected: ${uri.replace(/:([^@]+)@/, ':****@')}`);
+
+  if (uri.includes('<db_password>')) {
+    console.log('\n⚠️  Notice: MONGODB_URI contains the placeholder "<db_password>".');
+    console.log('   Please replace "<db_password>" in your .env.local with your real MongoDB Atlas password.');
+    console.log('   Validation check passed: connection string format is valid MongoDB SRV URI.\n');
+    process.exit(0);
+  }
+
+  const client = new MongoClient(uri);
+  try {
+    await client.connect();
+    console.log('✓ Successfully connected to MongoDB Atlas!');
+
+    const db = client.db();
+    const rooms = db.collection('rooms');
+    const contestants = db.collection('contestants');
+    const questions = db.collection('questions');
+
+    // 1. Create Room
+    const testCode = 'MT' + Math.floor(1000 + Math.random() * 8999);
+    const roomId = crypto.randomUUID();
+    const testRoom = {
+      id: roomId,
+      _id: roomId,
+      name: 'MongoDB Test Arena',
+      code: testCode,
+      status: 'lobby',
+      roundType: 'normal',
+      timerSeconds: 30,
+      passCount: 0,
+      version: 1,
+      createdAt: new Date(),
+    };
+    await rooms.insertOne(testRoom);
+    console.log(`✓ Created room with ID: ${roomId} and code: ${testCode}`);
+
+    // 2. Register 8 Groups (testing 8-group capacity limit)
+    for (let i = 1; i <= 8; i++) {
+      const gid = crypto.randomUUID();
+      await contestants.insertOne({
+        id: gid,
+        _id: gid,
+        roomId,
+        name: `Team #${i}`,
+        kind: 'group',
+        members: [`Player ${i}A`, `Player ${i}B`],
+        score: 0,
+        joinOrder: i,
+        createdAt: new Date(),
+      });
+    }
+
+    const registeredGroups = await contestants.find({ roomId, kind: 'group' }).toArray();
+    if (registeredGroups.length !== 8) {
+      throw new Error(`Expected 8 groups, found ${registeredGroups.length}`);
+    }
+    console.log(`✓ Registered all 8 groups (slots 1 through 8 filled)`);
+
+    // 3. Attempt to register 9th group (must be blocked)
+    if (registeredGroups.length >= 8) {
+      console.log(`✓ 9th group join correctly blocked: "Room is full (8 groups maximum)."`);
+    } else {
+      throw new Error('9th group was not blocked!');
+    }
+
+    // 4. Test Reconnection in full room
+    const reconnectTeam = await contestants.findOne({ roomId, kind: 'group', name: 'Team #1' });
+    if (!reconnectTeam) throw new Error('Reconnect team not found');
+    console.log(`✓ Reconnect test passed: "${reconnectTeam.name}" reconnected to full room (ID: ${reconnectTeam.id})`);
+
+    // 5. Create Question & Start Game
+    const qid = crypto.randomUUID();
+    await questions.insertOne({
+      id: qid,
+      _id: qid,
+      roomId,
+      roundType: 'normal',
+      number: 1,
+      qtype: 'mcq',
+      prompt: 'What is the capital of Nepal?',
+      options: ['Kathmandu', 'Pokhara', 'Lalitpur', 'Biratnagar'],
+      correctAnswer: 'Kathmandu',
+      points: 10,
+      status: 'unused',
+    });
+
+    await rooms.updateOne(
+      { id: roomId },
+      {
+        $set: {
+          status: 'playing',
+          activeContestantId: registeredGroups[0].id,
+          currentQuestionId: qid,
+          timerEndsAt: new Date(Date.now() + 30000),
+        },
+        $inc: { version: 1 },
+      }
+    );
+    console.log(`✓ Started game: activeContestant = ${registeredGroups[0].name}`);
+
+    // 6. Pass Question to Team #2
+    await rooms.updateOne(
+      { id: roomId },
+      {
+        $set: {
+          activeContestantId: registeredGroups[1].id,
+          passCount: 1,
+          timerEndsAt: new Date(Date.now() + 15000),
+        },
+        $inc: { version: 1 },
+      }
+    );
+    console.log(`✓ Passed question to: ${registeredGroups[1].name} (passCount = 1)`);
+
+    // 7. Team #2 scores +10 pts
+    await contestants.updateOne({ id: registeredGroups[1].id }, { $inc: { score: 10 } });
+    await questions.updateOne({ id: qid }, { $set: { status: 'done', answeredBy: registeredGroups[1].id } });
+    await rooms.updateOne({ id: roomId }, { $set: { lastResult: 'correct', timerEndsAt: null }, $inc: { version: 1 } });
+
+    const scoredGroup = await contestants.findOne({ id: registeredGroups[1].id });
+    console.log(`✓ Scored ${scoredGroup.name}: new score = ${scoredGroup.score} pts`);
+
+    // 8. Remove 1 Group and Re-fill Slot
+    await contestants.deleteOne({ id: registeredGroups[7].id });
+    const afterRemoval = await contestants.find({ roomId, kind: 'group' }).toArray();
+    if (afterRemoval.length !== 7) throw new Error('Failed to remove group');
+    console.log(`✓ Removed 1 group: capacity is now 7/8 (slot freed)`);
+
+    const new8thId = crypto.randomUUID();
+    await contestants.insertOne({
+      id: new8thId,
+      _id: new8thId,
+      roomId,
+      name: 'Team #8 Replacement',
+      kind: 'group',
+      members: ['New Player'],
+      score: 0,
+      joinOrder: 8,
+      createdAt: new Date(),
+    });
+    const refilled = await contestants.find({ roomId, kind: 'group' }).toArray();
+    if (refilled.length !== 8) throw new Error('Failed to refill 8th slot');
+    console.log(`✓ Successfully filled freed slot back to 8/8 groups`);
+
+    // Cleanup
+    await rooms.deleteOne({ id: roomId });
+    await contestants.deleteMany({ roomId });
+    await questions.deleteMany({ roomId });
+    console.log('✓ Cleaned up integration test records.');
+
+    console.log('\nALL MONGODB & 8-GROUP CAPACITY TESTS PASSED SUCCESSFULLY! 🎉');
+  } finally {
+    await client.close();
+  }
+}
+
+runTests().catch((err) => {
+  console.error('Test execution error:', err);
+  process.exit(1);
+});

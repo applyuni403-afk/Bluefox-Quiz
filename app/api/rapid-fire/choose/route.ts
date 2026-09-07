@@ -1,0 +1,64 @@
+import { NextResponse } from 'next/server';
+import { getRoomsCollection, getQuestionsCollection } from '@/lib/db';
+import { chooseRapidFireQuestion } from '@/lib/actions';
+import { checkIsAdmin } from '@/lib/session';
+
+export async function POST(request: Request) {
+  try {
+    const body = await request.json();
+    const { roomId, questionId, contestantId } = body;
+
+    if (!roomId || !questionId) {
+      return NextResponse.json(
+        { error: 'Missing roomId or questionId' },
+        { status: 400 }
+      );
+    }
+
+    const rooms = await getRoomsCollection();
+    const room = await rooms.findOne({ id: roomId });
+
+    if (!room) {
+      return NextResponse.json({ error: 'Room not found' }, { status: 404 });
+    }
+
+    if (room.roundType !== 'rapid_fire') {
+      return NextResponse.json(
+        { error: 'Room is not in rapid fire mode' },
+        { status: 400 }
+      );
+    }
+
+    const isAdmin = await checkIsAdmin();
+
+    // Verify contestant if not admin
+    if (!isAdmin) {
+      if (!contestantId || room.activeContestantId !== contestantId) {
+        return NextResponse.json(
+          { error: 'Only the active rapid-fire player may choose a question' },
+          { status: 403 }
+        );
+      }
+    }
+
+    const questions = await getQuestionsCollection();
+    const q = await questions.findOne({ id: questionId });
+
+    if (!q || q.status === 'done') {
+      return NextResponse.json(
+        { error: 'This question has already been completed' },
+        { status: 400 }
+      );
+    }
+
+    await chooseRapidFireQuestion(roomId, questionId);
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Rapid Fire choose error:', error);
+    return NextResponse.json(
+      { error: (error as Error).message || 'Failed to select question' },
+      { status: 500 }
+    );
+  }
+}
