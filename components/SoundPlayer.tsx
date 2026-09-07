@@ -46,7 +46,7 @@ export function SoundPlayer({ lastResult }: SoundPlayerProps) {
         <button
           type="button"
           onClick={handleUnlockAudio}
-          className="mb-4 inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-zinc-800 text-zinc-200 hover:bg-zinc-700 transition shadow-sm"
+          className="mb-4 inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-white border border-blue-200 text-slate-700 hover:bg-slate-50 transition shadow-xs"
         >
           <VolumeX className="w-3.5 h-3.5 text-amber-400" />
           <span>Tap to enable sound effects 🔊</span>

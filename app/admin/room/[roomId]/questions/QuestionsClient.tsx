@@ -166,65 +166,65 @@ export function QuestionsClient({ roomId }: QuestionsClientProps) {
   };
 
   return (
-    <main className="min-h-screen bg-[#07090e] text-white p-4 sm:p-8 relative overflow-hidden flex flex-col items-center">
+    <main className="min-h-screen bg-[#edf2f9] text-slate-800 p-4 sm:p-8 relative overflow-hidden flex flex-col items-center selection:bg-blue-500/20">
       {/* Ambient background glows */}
-      <div className="absolute top-0 left-1/4 w-[600px] h-[500px] bg-blue-600/10 rounded-full blur-[140px] pointer-events-none" />
-      <div className="absolute bottom-0 right-1/4 w-[500px] h-[400px] bg-indigo-600/10 rounded-full blur-[140px] pointer-events-none" />
+      <div className="absolute top-0 left-1/4 w-[600px] h-[500px] bg-blue-400/10 rounded-full blur-[140px] pointer-events-none" />
+      <div className="absolute bottom-0 right-1/4 w-[500px] h-[400px] bg-indigo-400/10 rounded-full blur-[140px] pointer-events-none" />
 
       <div className="w-full max-w-5xl space-y-6 relative z-10">
         {/* Top Header */}
-        <header className="flex items-center justify-between gap-4 pb-4 border-b border-white/[0.06]">
+        <header className="flex items-center justify-between gap-4 pb-4 border-b border-blue-200/60">
           <div className="flex items-center gap-3">
             <Link
               href={`/admin/room/${roomId}`}
-              className="p-2.5 rounded-2xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-zinc-300 transition"
+              className="p-2.5 rounded-2xl bg-white hover:bg-slate-50 border border-blue-100 text-slate-600 hover:text-slate-900 transition shadow-2xs"
               title="Return to Host Console"
             >
               <ArrowLeft className="w-5 h-5" />
             </Link>
             <div>
-              <h1 className="text-xl sm:text-2xl font-black tracking-tight text-white">
+              <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900">
                 Question Bank
               </h1>
-              <p className="text-xs text-zinc-400 font-medium">Manage quiz content & media</p>
+              <p className="text-xs text-slate-500 font-medium">Manage quiz content & media</p>
             </div>
           </div>
 
           <Link
             href={`/admin/room/${roomId}`}
-            className="px-4 py-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-xs font-bold text-zinc-300 transition"
+            className="px-4 py-2 rounded-xl bg-white hover:bg-slate-50 border border-blue-100 text-xs font-bold text-slate-700 transition shadow-2xs"
           >
             Host Console
           </Link>
         </header>
 
         {error && (
-          <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-semibold">
+          <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">
             {error}
           </div>
         )}
 
         {success && (
-          <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-semibold flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+          <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
             <span>{success}</span>
           </div>
         )}
 
         {/* Add Question Form Card */}
-        <section className="bg-white/[0.03] backdrop-blur-2xl border border-white/[0.08] rounded-3xl p-6 sm:p-8 shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
+        <section className="bg-white/85 backdrop-blur-2xl border border-blue-100 rounded-3xl p-6 sm:p-8 shadow-[0_20px_50px_rgba(30,58,138,0.06)]">
           <div className="flex items-center gap-2.5 mb-6">
-            <div className="w-8 h-8 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
+            <div className="w-8 h-8 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600">
               <Plus className="w-4 h-4" />
             </div>
-            <h2 className="text-lg font-black text-white">Add Question</h2>
+            <h2 className="text-lg font-black text-slate-900">Add Question</h2>
           </div>
 
           <form onSubmit={handleCreate} className="space-y-6">
             {/* Category & Format Selectors */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-2">
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">
                   Round
                 </label>
                 <div className="grid grid-cols-2 gap-2">
@@ -233,8 +233,8 @@ export function QuestionsClient({ roomId }: QuestionsClientProps) {
                     onClick={() => setRoundType('normal')}
                     className={`py-2.5 px-3 rounded-2xl text-xs font-black transition flex items-center justify-center gap-2 ${
                       roundType === 'normal'
-                        ? 'bg-blue-600 text-white shadow-[0_0_20px_rgba(59,130,246,0.35)] border border-blue-400/30'
-                        : 'bg-white/[0.02] text-zinc-400 border border-white/[0.06] hover:bg-white/[0.04]'
+                        ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25 border border-blue-500'
+                        : 'bg-slate-50 text-slate-600 border border-slate-200 hover:bg-white'
                     }`}
                   >
                     <Sparkles className="w-3.5 h-3.5" />
@@ -245,8 +245,8 @@ export function QuestionsClient({ roomId }: QuestionsClientProps) {
                     onClick={() => setRoundType('rapid_fire')}
                     className={`py-2.5 px-3 rounded-2xl text-xs font-black transition flex items-center justify-center gap-2 ${
                       roundType === 'rapid_fire'
-                        ? 'bg-amber-600 text-white shadow-[0_0_20px_rgba(245,158,11,0.35)] border border-amber-400/30'
-                        : 'bg-white/[0.02] text-zinc-400 border border-white/[0.06] hover:bg-white/[0.04]'
+                        ? 'bg-amber-600 text-white shadow-md shadow-amber-500/25 border border-amber-500'
+                        : 'bg-slate-50 text-slate-600 border border-slate-200 hover:bg-white'
                     }`}
                   >
                     <Flame className="w-3.5 h-3.5" />
@@ -256,7 +256,7 @@ export function QuestionsClient({ roomId }: QuestionsClientProps) {
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-2">
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">
                   Format
                 </label>
                 <div className="grid grid-cols-4 gap-1.5">
@@ -267,8 +267,8 @@ export function QuestionsClient({ roomId }: QuestionsClientProps) {
                       onClick={() => setQtype(t)}
                       className={`py-2 rounded-2xl text-xs font-black uppercase transition flex flex-col items-center gap-1 ${
                         qtype === t
-                          ? 'bg-indigo-600 text-white shadow-[0_0_20px_rgba(99,102,241,0.35)] border border-indigo-400/30'
-                          : 'bg-white/[0.02] text-zinc-400 border border-white/[0.06] hover:bg-white/[0.04]'
+                          ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/25 border border-indigo-500'
+                          : 'bg-slate-50 text-slate-600 border border-slate-200 hover:bg-white'
                       }`}
                     >
                       {t === 'text' && <FileText className="w-3.5 h-3.5" />}
@@ -284,7 +284,7 @@ export function QuestionsClient({ roomId }: QuestionsClientProps) {
 
             {/* Prompt */}
             <div>
-              <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-2">
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">
                 Prompt
               </label>
               <textarea
@@ -293,15 +293,15 @@ export function QuestionsClient({ roomId }: QuestionsClientProps) {
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
                 placeholder="Enter question text..."
-                className="w-full bg-black/40 border border-white/[0.08] rounded-2xl px-4 py-3 text-white placeholder:text-zinc-600 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 font-medium text-sm transition"
+                className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 font-medium text-sm transition shadow-2xs"
               />
             </div>
 
             {/* Media Upload */}
             {(qtype === 'video' || qtype === 'audio') && (
-              <div className="p-4 rounded-2xl bg-black/40 border border-white/[0.08] space-y-3">
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
                 <div className="flex flex-col sm:flex-row gap-3 items-center">
-                  <label className="w-full sm:w-auto px-4 py-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.1] text-xs font-bold text-white cursor-pointer flex items-center justify-center gap-2 transition">
+                  <label className="w-full sm:w-auto px-4 py-2 rounded-xl bg-white hover:bg-slate-100 border border-slate-300 text-xs font-bold text-slate-700 cursor-pointer flex items-center justify-center gap-2 transition shadow-2xs">
                     <Upload className="w-4 h-4" />
                     <span>{uploading ? 'Uploading...' : 'Upload File'}</span>
                     <input
@@ -318,11 +318,11 @@ export function QuestionsClient({ roomId }: QuestionsClientProps) {
                     value={mediaUrl}
                     onChange={(e) => setMediaUrl(e.target.value)}
                     placeholder="or paste direct URL..."
-                    className="flex-1 w-full bg-black/50 border border-white/[0.08] rounded-xl px-3 py-2 text-xs text-white placeholder:text-zinc-600 focus:outline-none focus:border-blue-500/50"
+                    className="flex-1 w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                   />
                 </div>
                 {mediaUrl && (
-                  <p className="text-xs text-emerald-400 truncate">Attached: {mediaUrl}</p>
+                  <p className="text-xs text-emerald-700 font-medium truncate">Attached: {mediaUrl}</p>
                 )}
               </div>
             )}
@@ -330,7 +330,7 @@ export function QuestionsClient({ roomId }: QuestionsClientProps) {
             {/* MCQ Options */}
             {qtype === 'mcq' && (
               <div className="space-y-2.5">
-                <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-400">
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500">
                   Multiple Choice Options
                 </label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
@@ -338,7 +338,7 @@ export function QuestionsClient({ roomId }: QuestionsClientProps) {
                     const letter = String.fromCharCode(65 + idx);
                     return (
                       <div key={idx} className="flex items-center gap-2">
-                        <span className="w-8 h-8 rounded-xl bg-white/[0.05] border border-white/[0.08] flex items-center justify-center font-black text-xs text-zinc-300 shrink-0">
+                        <span className="w-8 h-8 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center font-black text-xs text-slate-700 shrink-0">
                           {letter}
                         </span>
                         <input
@@ -351,7 +351,7 @@ export function QuestionsClient({ roomId }: QuestionsClientProps) {
                             setMcqOptions(copy);
                           }}
                           placeholder={`Option ${letter}`}
-                          className="flex-1 bg-black/40 border border-white/[0.08] rounded-xl px-3 py-2 text-xs text-white placeholder:text-zinc-600 focus:outline-none focus:border-blue-500/50"
+                          className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                         />
                       </div>
                     );
@@ -362,7 +362,7 @@ export function QuestionsClient({ roomId }: QuestionsClientProps) {
 
             {/* Correct Answer */}
             <div>
-              <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-2">
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">
                 Correct Answer
               </label>
               {qtype === 'mcq' ? (
@@ -370,15 +370,15 @@ export function QuestionsClient({ roomId }: QuestionsClientProps) {
                   required
                   value={correctAnswer}
                   onChange={(e) => setCorrectAnswer(e.target.value)}
-                  className="w-full bg-black/40 border border-white/[0.08] rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-blue-500/50 font-medium"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-900 focus:outline-none focus:bg-white focus:border-blue-500 font-medium shadow-2xs"
                 >
-                  <option value="" className="bg-zinc-900">
+                  <option value="">
                     -- Select Option --
                   </option>
                   {mcqOptions
                     .filter((o) => o.trim().length > 0)
                     .map((opt, idx) => (
-                      <option key={idx} value={opt} className="bg-zinc-900">
+                      <option key={idx} value={opt}>
                         {String.fromCharCode(65 + idx)}: {opt}
                       </option>
                     ))}
@@ -390,7 +390,7 @@ export function QuestionsClient({ roomId }: QuestionsClientProps) {
                   value={correctAnswer}
                   onChange={(e) => setCorrectAnswer(e.target.value)}
                   placeholder="Answer key"
-                  className="w-full bg-black/40 border border-white/[0.08] rounded-xl px-3 py-2 text-xs text-white placeholder:text-zinc-600 focus:outline-none focus:border-blue-500/50 font-medium"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 font-medium shadow-2xs"
                 />
               )}
             </div>
@@ -398,7 +398,7 @@ export function QuestionsClient({ roomId }: QuestionsClientProps) {
             {/* Points & Timer & Rapid Fire Tile */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
-                <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-1">
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">
                   Points
                 </label>
                 <input
@@ -407,12 +407,12 @@ export function QuestionsClient({ roomId }: QuestionsClientProps) {
                   max={100}
                   value={points}
                   onChange={(e) => setPoints(parseInt(e.target.value) || 10)}
-                  className="w-full bg-black/40 border border-white/[0.08] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500/50"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                 />
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-1">
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">
                   Timer (Sec)
                 </label>
                 <input
@@ -422,13 +422,13 @@ export function QuestionsClient({ roomId }: QuestionsClientProps) {
                   onChange={(e) =>
                     setTimerSeconds(e.target.value ? parseInt(e.target.value) : undefined)
                   }
-                  className="w-full bg-black/40 border border-white/[0.08] rounded-xl px-3 py-2 text-xs text-white placeholder:text-zinc-600 focus:outline-none focus:border-blue-500/50"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                 />
               </div>
 
               {roundType === 'rapid_fire' && (
                 <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-amber-400 mb-1">
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-amber-700 mb-1">
                     Tile #
                   </label>
                   <input
@@ -438,7 +438,7 @@ export function QuestionsClient({ roomId }: QuestionsClientProps) {
                     onChange={(e) =>
                       setRapidFireNumber(e.target.value ? parseInt(e.target.value) : undefined)
                     }
-                    className="w-full bg-black/40 border border-amber-500/30 rounded-xl px-3 py-2 text-xs text-amber-300 placeholder:text-zinc-600 focus:outline-none focus:border-amber-500/60"
+                    className="w-full bg-amber-50/60 border border-amber-300 rounded-xl px-3 py-2 text-xs text-amber-900 placeholder:text-amber-400 focus:outline-none focus:bg-white focus:border-amber-500 focus:ring-2 focus:ring-amber-100"
                   />
                 </div>
               )}
@@ -447,7 +447,7 @@ export function QuestionsClient({ roomId }: QuestionsClientProps) {
             <button
               type="submit"
               disabled={submitting || uploading}
-              className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 font-black text-xs uppercase tracking-wider text-white shadow-[0_0_25px_rgba(59,130,246,0.35)] transition-all active:scale-[0.99] disabled:opacity-50 flex items-center justify-center gap-2"
+              className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-600 hover:from-blue-700 hover:to-indigo-700 font-black text-xs uppercase tracking-wider text-white shadow-md shadow-blue-500/25 transition-all active:scale-[0.99] disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {submitting ? (
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -462,19 +462,19 @@ export function QuestionsClient({ roomId }: QuestionsClientProps) {
         </section>
 
         {/* Question Bank List Card */}
-        <section className="bg-white/[0.03] backdrop-blur-2xl border border-white/[0.08] rounded-3xl p-6 sm:p-8 shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
-          <div className="flex flex-wrap items-center justify-between gap-3 mb-6 pb-4 border-b border-white/[0.06]">
+        <section className="bg-white/85 backdrop-blur-2xl border border-blue-100 rounded-3xl p-6 sm:p-8 shadow-[0_20px_50px_rgba(30,58,138,0.06)]">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-6 pb-4 border-b border-blue-200/60">
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+              <div className="w-8 h-8 rounded-xl bg-indigo-50 border border-indigo-200 flex items-center justify-center text-indigo-600">
                 <Layers className="w-4 h-4" />
               </div>
-              <h2 className="text-lg font-black text-white">
+              <h2 className="text-lg font-black text-slate-900">
                 Questions ({questions.length})
               </h2>
             </div>
 
             {/* Filter pills */}
-            <div className="flex items-center gap-1.5 bg-black/40 p-1 rounded-xl border border-white/[0.06]">
+            <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl border border-slate-200">
               {(['all', 'normal', 'rapid_fire'] as const).map((f) => (
                 <button
                   key={f}
@@ -482,8 +482,8 @@ export function QuestionsClient({ roomId }: QuestionsClientProps) {
                   onClick={() => setFilter(f)}
                   className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase transition ${
                     filter === f
-                      ? 'bg-white/[0.1] text-white shadow-sm'
-                      : 'text-zinc-500 hover:text-zinc-300'
+                      ? 'bg-white text-slate-900 shadow-xs'
+                      : 'text-slate-500 hover:text-slate-800'
                   }`}
                 >
                   {f === 'rapid_fire' ? 'Rapid' : f}
@@ -493,9 +493,9 @@ export function QuestionsClient({ roomId }: QuestionsClientProps) {
           </div>
 
           {loading ? (
-            <div className="p-8 text-center text-zinc-500 text-xs">Loading bank...</div>
+            <div className="p-8 text-center text-slate-500 text-xs font-medium">Loading bank...</div>
           ) : filteredQuestions.length === 0 ? (
-            <div className="p-8 text-center text-zinc-500 text-xs">
+            <div className="p-8 text-center text-slate-500 text-xs font-medium">
               No questions found. Add some above.
             </div>
           ) : (
@@ -503,39 +503,39 @@ export function QuestionsClient({ roomId }: QuestionsClientProps) {
               {filteredQuestions.map((q) => (
                 <div
                   key={q.id}
-                  className="p-4 rounded-2xl bg-white/[0.02] hover:bg-white/[0.04] border border-white/[0.06] hover:border-white/[0.12] flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all duration-200"
+                  className="p-4 rounded-2xl bg-white hover:bg-slate-50/80 border border-blue-100 hover:border-blue-300 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all duration-200 shadow-2xs"
                 >
                   <div className="space-y-1 min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="px-2 py-0.5 rounded-md text-[9px] font-black uppercase bg-white/[0.05] text-zinc-300 border border-white/[0.06]">
+                      <span className="px-2 py-0.5 rounded-md text-[9px] font-black uppercase bg-slate-100 text-slate-700 border border-slate-200">
                         {q.qtype}
                       </span>
-                      <span className="px-2 py-0.5 rounded-md text-[9px] font-black uppercase bg-blue-500/10 text-blue-300 border border-blue-500/20">
+                      <span className="px-2 py-0.5 rounded-md text-[9px] font-black uppercase bg-blue-50 text-blue-700 border border-blue-200">
                         {q.roundType === 'rapid_fire' ? `#${q.number}` : 'Normal'}
                       </span>
-                      <span className="text-[11px] font-black text-indigo-300">
+                      <span className="text-[11px] font-black text-indigo-600">
                         {q.points} PTS
                       </span>
                       {q.timerSeconds && (
-                        <span className="text-[11px] text-zinc-500 font-mono">
+                        <span className="text-[11px] text-slate-500 font-mono">
                           {q.timerSeconds}s
                         </span>
                       )}
                       <span
                         className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md ${
                           q.status === 'done'
-                            ? 'bg-white/[0.04] text-zinc-500'
+                            ? 'bg-slate-100 text-slate-500'
                             : q.status === 'active'
-                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                            : 'bg-blue-500/15 text-blue-300'
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                            : 'bg-blue-50 text-blue-700 border border-blue-200'
                         }`}
                       >
                         {q.status}
                       </span>
                     </div>
 
-                    <p className="font-bold text-white text-sm truncate">{q.prompt}</p>
-                    <p className="text-xs text-emerald-400 font-semibold truncate">
+                    <p className="font-bold text-slate-900 text-sm truncate">{q.prompt}</p>
+                    <p className="text-xs text-emerald-700 font-semibold truncate">
                       Ans: {q.correctAnswer}
                     </p>
                   </div>
@@ -545,7 +545,7 @@ export function QuestionsClient({ roomId }: QuestionsClientProps) {
                       type="button"
                       onClick={() => handleReset(q.id)}
                       title="Reset Status"
-                      className="p-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-zinc-400 hover:text-white border border-white/[0.06] transition"
+                      className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 border border-slate-200 transition"
                     >
                       <RotateCcw className="w-3.5 h-3.5" />
                     </button>
@@ -553,7 +553,7 @@ export function QuestionsClient({ roomId }: QuestionsClientProps) {
                       type="button"
                       onClick={() => handleDelete(q.id)}
                       title="Delete Question"
-                      className="p-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 transition"
+                      className="p-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 transition"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>

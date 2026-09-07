@@ -97,12 +97,12 @@ export function ScoreBoard({
   };
 
   return (
-    <div className="w-full bg-white/[0.03] backdrop-blur-2xl border border-white/[0.08] rounded-3xl p-5 sm:p-6 shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
+    <div className="w-full bg-white/85 backdrop-blur-2xl border border-blue-100 rounded-3xl p-5 sm:p-6 shadow-[0_20px_50px_rgba(30,58,138,0.06)]">
       {/* Header */}
-      <div className="flex items-center justify-between mb-4 pb-3.5 border-b border-white/[0.06]">
+      <div className="flex items-center justify-between mb-4 pb-3.5 border-b border-slate-100">
         <div className="flex items-center gap-2">
-          <Trophy className="w-4 h-4 text-amber-400" />
-          <h3 className="font-black text-sm uppercase tracking-wider text-white">
+          <Trophy className="w-4 h-4 text-amber-500" />
+          <h3 className="font-black text-sm uppercase tracking-wider text-slate-900">
             Leaderboard
           </h3>
         </div>
@@ -114,8 +114,8 @@ export function ScoreBoard({
                 key={i}
                 className={`w-1.5 h-1.5 rounded-full transition-all ${
                   i < groups.length
-                    ? 'bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.8)]'
-                    : 'bg-white/10'
+                    ? 'bg-blue-600 shadow-xs'
+                    : 'bg-slate-200'
                 }`}
               />
             ))}
@@ -123,8 +123,8 @@ export function ScoreBoard({
           <span
             className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
               groups.length >= 8
-                ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                : 'text-zinc-400 bg-white/[0.04]'
+                ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                : 'text-slate-600 bg-slate-100 border border-slate-200'
             }`}
           >
             {groups.length}/8
@@ -140,19 +140,19 @@ export function ScoreBoard({
               type="button"
               disabled={groups.length >= 8}
               onClick={() => setIsAddingGroup(true)}
-              className="w-full flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-2xl border border-dashed border-white/15 text-xs font-bold text-zinc-300 hover:text-white hover:bg-white/[0.04] transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+              className="w-full flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-2xl border border-dashed border-blue-200 text-xs font-bold text-blue-700 hover:text-blue-800 hover:bg-blue-50/70 transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs"
             >
-              <UserPlus className="w-3.5 h-3.5 text-blue-400" />
+              <UserPlus className="w-3.5 h-3.5 text-blue-600" />
               <span>{groups.length >= 8 ? '8 Slots Full' : '+ Add Team'}</span>
             </button>
           ) : (
             <form
               onSubmit={handleCreateGroup}
-              className="p-3.5 rounded-2xl bg-black/40 border border-white/[0.08] space-y-2.5"
+              className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5"
             >
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-white flex items-center gap-1.5">
-                  <UserPlus className="w-3.5 h-3.5 text-blue-400" />
+                <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                  <UserPlus className="w-3.5 h-3.5 text-blue-600" />
                   Add Team (#{groups.length + 1})
                 </span>
                 <button
@@ -161,14 +161,14 @@ export function ScoreBoard({
                     setIsAddingGroup(false);
                     setAddError('');
                   }}
-                  className="text-zinc-400 hover:text-white p-0.5"
+                  className="text-slate-400 hover:text-slate-600 p-0.5"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
               </div>
 
               {addError && (
-                <div className="text-[11px] font-medium text-rose-300 bg-rose-500/10 p-2 rounded-xl">
+                <div className="text-[11px] font-medium text-rose-700 bg-rose-50 p-2 rounded-xl border border-rose-200">
                   {addError}
                 </div>
               )}
@@ -180,7 +180,7 @@ export function ScoreBoard({
                 value={newGroupName}
                 onChange={(e) => setNewGroupName(e.target.value)}
                 placeholder="Team Name"
-                className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-3 py-2 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-blue-500/60"
+                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 shadow-2xs"
               />
 
               <input
@@ -188,21 +188,21 @@ export function ScoreBoard({
                 value={newGroupMembers}
                 onChange={(e) => setNewGroupMembers(e.target.value)}
                 placeholder="Members (comma-separated, optional)"
-                className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-3 py-2 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-blue-500/60"
+                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 shadow-2xs"
               />
 
               <div className="flex justify-end gap-2 pt-1">
                 <button
                   type="button"
                   onClick={() => setIsAddingGroup(false)}
-                  className="px-2.5 py-1 text-xs font-medium text-zinc-400 hover:text-white"
+                  className="px-2.5 py-1 text-xs font-medium text-slate-500 hover:text-slate-800"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmittingGroup || !newGroupName.trim()}
-                  className="px-3.5 py-1 rounded-xl bg-blue-600 hover:bg-blue-500 text-xs font-bold text-white transition disabled:opacity-50"
+                  className="px-3.5 py-1 rounded-xl bg-blue-600 hover:bg-blue-700 text-xs font-bold text-white transition disabled:opacity-50 shadow-2xs"
                 >
                   {isSubmittingGroup ? 'Adding...' : 'Save'}
                 </button>
@@ -214,8 +214,8 @@ export function ScoreBoard({
 
       {/* Groups List */}
       {groups.length === 0 ? (
-        <div className="p-8 text-center text-zinc-500 bg-white/[0.01] rounded-2xl border border-dashed border-white/[0.06]">
-          <Users className="w-7 h-7 mx-auto mb-2 opacity-30" />
+        <div className="p-8 text-center text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+          <Users className="w-7 h-7 mx-auto mb-2 opacity-40 text-slate-400" />
           <p className="text-xs font-semibold">No teams registered yet</p>
         </div>
       ) : (
@@ -229,8 +229,8 @@ export function ScoreBoard({
                 key={group.id}
                 className={`flex items-center justify-between p-3 rounded-2xl border transition-all ${
                   isActive
-                    ? 'bg-blue-500/10 border-blue-500/40 shadow-[0_0_20px_rgba(59,130,246,0.15)] ring-1 ring-blue-500/30'
-                    : 'bg-white/[0.02] border-white/[0.05] hover:border-white/[0.1]'
+                    ? 'bg-blue-50/80 border-blue-400 shadow-xs ring-1 ring-blue-300'
+                    : 'bg-slate-50/70 border-slate-200/80 hover:border-blue-200 hover:bg-white'
                 }`}
               >
                 <div className="flex items-center gap-2.5 min-w-0">
@@ -238,12 +238,12 @@ export function ScoreBoard({
                   <div
                     className={`w-6 h-6 rounded-lg flex items-center justify-center font-black text-[11px] shrink-0 ${
                       index === 0
-                        ? 'bg-gradient-to-tr from-amber-500 to-yellow-300 text-amber-950 shadow-[0_0_10px_rgba(245,158,11,0.4)]'
+                        ? 'bg-gradient-to-tr from-amber-400 to-yellow-300 text-amber-950 shadow-xs'
                         : index === 1
-                        ? 'bg-gradient-to-tr from-zinc-300 to-slate-100 text-zinc-900'
+                        ? 'bg-gradient-to-tr from-slate-300 to-slate-200 text-slate-800'
                         : index === 2
-                        ? 'bg-gradient-to-tr from-amber-700 to-amber-600 text-amber-100'
-                        : 'bg-white/[0.06] text-zinc-400'
+                        ? 'bg-gradient-to-tr from-amber-600 to-amber-500 text-white'
+                        : 'bg-slate-200 text-slate-600'
                     }`}
                   >
                     {index + 1}
@@ -252,18 +252,18 @@ export function ScoreBoard({
                   {/* Group details */}
                   <div className="min-w-0">
                     <div className="flex items-center gap-1.5">
-                      <span className="font-bold text-xs sm:text-sm text-white truncate">
+                      <span className="font-bold text-xs sm:text-sm text-slate-900 truncate">
                         {group.name}
                       </span>
                       {isActive && (
-                        <span className="px-1.5 py-0.2 rounded text-[9px] font-black uppercase tracking-wider bg-blue-500 text-white animate-pulse">
+                        <span className="px-1.5 py-0.2 rounded text-[9px] font-black uppercase tracking-wider bg-blue-600 text-white animate-pulse">
                           Turn
                         </span>
                       )}
                     </div>
 
                     {Array.isArray(group.members) && group.members.length > 0 && (
-                      <div className="text-[10px] text-zinc-400 truncate">
+                      <div className="text-[10px] text-slate-500 truncate">
                         {group.members.join(', ')}
                       </div>
                     )}
@@ -273,13 +273,13 @@ export function ScoreBoard({
                 {/* Score and Controls */}
                 <div className="flex items-center gap-2 shrink-0 ml-2">
                   {isAdmin && (
-                    <div className="flex items-center gap-0.5 bg-black/40 border border-white/[0.06] rounded-xl p-0.5">
+                    <div className="flex items-center gap-0.5 bg-white border border-slate-200 rounded-xl p-0.5 shadow-2xs">
                       <button
                         type="button"
                         disabled={isUpdating}
                         onClick={() => handleScoreChange(group.id, -5)}
                         title="Deduct 5 points"
-                        className="p-1 hover:bg-white/10 rounded-lg text-zinc-400 hover:text-white transition disabled:opacity-40"
+                        className="p-1 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-slate-800 transition disabled:opacity-40"
                       >
                         <Minus className="w-3 h-3" />
                       </button>
@@ -288,7 +288,7 @@ export function ScoreBoard({
                         disabled={isUpdating}
                         onClick={() => handleScoreChange(group.id, 10)}
                         title="Add 10 points"
-                        className="p-1 hover:bg-white/10 rounded-lg text-zinc-400 hover:text-white transition disabled:opacity-40"
+                        className="p-1 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-slate-800 transition disabled:opacity-40"
                       >
                         <Plus className="w-3 h-3" />
                       </button>
@@ -298,7 +298,7 @@ export function ScoreBoard({
                           disabled={isUpdating}
                           onClick={() => handleRemoveGroup(group)}
                           title="Kick this team"
-                          className="p-1 hover:bg-rose-500/20 rounded-lg text-zinc-400 hover:text-rose-400 transition disabled:opacity-40 ml-0.5"
+                          className="p-1 hover:bg-rose-50 rounded-lg text-rose-500 hover:text-rose-700 transition disabled:opacity-40 ml-0.5"
                         >
                           <Trash2 className="w-3 h-3" />
                         </button>
@@ -307,10 +307,10 @@ export function ScoreBoard({
                   )}
 
                   <div className="text-right min-w-[36px]">
-                    <span className="font-black text-base text-white">
+                    <span className="font-black text-base text-slate-900">
                       {group.score}
                     </span>
-                    <span className="text-[9px] text-zinc-500 block font-bold uppercase tracking-wider">
+                    <span className="text-[9px] text-slate-400 block font-bold uppercase tracking-wider">
                       PTS
                     </span>
                   </div>

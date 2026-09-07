@@ -18,8 +18,8 @@ export function SiteLogo({ size = 'md', className = '', withGlow = true }: SiteL
 
   return (
     <div
-      className={`relative inline-flex items-center justify-center shrink-0 overflow-hidden bg-[#0a0d14] border border-white/10 ${config.box} ${
-        withGlow ? 'shadow-[0_0_25px_rgba(59,130,246,0.3)]' : ''
+      className={`relative inline-flex items-center justify-center shrink-0 overflow-hidden bg-white border border-blue-100 ${config.box} ${
+        withGlow ? 'shadow-md shadow-blue-500/15 ring-1 ring-blue-100' : ''
       } ${className}`}
     >
       <Image

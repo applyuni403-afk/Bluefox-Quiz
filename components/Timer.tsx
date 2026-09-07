@@ -13,8 +13,8 @@ export function Timer({ endsAt, size = 'md' }: TimerProps) {
 
   if (endsAt === null || endsAt === undefined) {
     return (
-      <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/[0.03] border border-white/[0.08] text-zinc-500 font-mono text-xs font-semibold backdrop-blur-md">
-        <Clock className="w-3.5 h-3.5 text-zinc-600" />
+      <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-100/90 border border-slate-200 text-slate-500 font-mono text-xs font-semibold shadow-2xs">
+        <Clock className="w-3.5 h-3.5 text-slate-400" />
         <span>00:00</span>
       </div>
     );
@@ -26,18 +26,18 @@ export function Timer({ endsAt, size = 'md' }: TimerProps) {
   let colorClasses = '';
   if (isExpired) {
     colorClasses =
-      'bg-rose-500/10 border-rose-500/40 text-rose-400 shadow-[0_0_30px_rgba(244,63,94,0.25)]';
+      'bg-rose-50 border-rose-300 text-rose-600 shadow-sm shadow-rose-500/10';
   } else if (isCritical) {
     colorClasses =
-      'bg-amber-500/15 border-amber-500/50 text-amber-300 shadow-[0_0_30px_rgba(245,158,11,0.3)] animate-pulse';
+      'bg-amber-50 border-amber-300 text-amber-700 shadow-sm shadow-amber-500/10 animate-pulse';
   } else {
     colorClasses =
-      'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 shadow-[0_0_25px_rgba(16,185,129,0.15)]';
+      'bg-emerald-50 border-emerald-300 text-emerald-700 shadow-sm shadow-emerald-500/10';
   }
 
   return (
     <div
-      className={`inline-flex items-center justify-center border font-mono font-black tracking-wider transition-all duration-300 backdrop-blur-xl ${colorClasses} ${
+      className={`inline-flex items-center justify-center border font-mono font-black tracking-wider transition-all duration-300 backdrop-blur-md ${colorClasses} ${
         isLg
           ? 'px-7 py-3 rounded-2xl text-4xl sm:text-5xl gap-3.5'
           : isSm
@@ -46,7 +46,7 @@ export function Timer({ endsAt, size = 'md' }: TimerProps) {
       }`}
     >
       {isExpired ? (
-        <AlertTriangle className={isLg ? 'w-8 h-8 text-rose-400' : 'w-4 h-4 text-rose-400'} />
+        <AlertTriangle className={isLg ? 'w-8 h-8 text-rose-600' : 'w-4 h-4 text-rose-600'} />
       ) : (
         <Clock
           className={`${isLg ? 'w-7 h-7' : 'w-4 h-4'} ${
@@ -55,11 +55,9 @@ export function Timer({ endsAt, size = 'md' }: TimerProps) {
           style={{ animationDuration: '6s' }}
         />
       )}
-      <span className="drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]">
-        {isExpired ? '00:00' : formatted}
-      </span>
+      <span>{isExpired ? '00:00' : formatted}</span>
       {isExpired && (
-        <span className="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30 font-sans">
+        <span className="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 border border-rose-200 font-sans">
           Time
         </span>
       )}
