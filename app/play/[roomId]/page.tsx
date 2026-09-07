@@ -10,6 +10,7 @@ import { ScoreBoard } from '@/components/ScoreBoard';
 import { RapidFireBoard } from '@/components/RapidFireBoard';
 import { SoundPlayer } from '@/components/SoundPlayer';
 import { SiteLogo } from '@/components/SiteLogo';
+import { useNotification } from '@/context/NotificationContext';
 import {
   Users,
   SkipForward,
@@ -26,6 +27,7 @@ export default function PlayRoomPage({
   params: Promise<{ roomId: string }>;
 }) {
   const { roomId } = use(params);
+  const { toast } = useNotification();
   const { room, contestants, question, board, error, isLoading, mutate } =
     useGameState(roomId);
 
@@ -84,9 +86,12 @@ export default function PlayRoomPage({
         throw new Error(err.error || 'Failed to pass question');
       }
 
+      toast.info('Turn Passed', 'Passed turn to the next group in rotation.');
       mutate();
     } catch (err) {
-      setPassError((err as Error).message);
+      const msg = (err as Error).message;
+      setPassError(msg);
+      toast.warning('Pass Failed', msg);
     } finally {
       setPassing(false);
     }
@@ -108,9 +113,12 @@ export default function PlayRoomPage({
         const err = await res.json();
         throw new Error(err.error || 'Failed to select question');
       }
+      toast.success('Question Selected', 'Tile launched for your team.');
       mutate();
     } catch (err) {
+      const msg = (err as Error).message;
       console.error('Rapid fire error:', err);
+      toast.error('Selection Failed', msg || 'Could not select tile');
     }
   };
 

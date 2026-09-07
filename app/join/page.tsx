@@ -7,6 +7,7 @@ import useSWR from 'swr';
 import { Play, Users, Plus, X, ArrowRight, ShieldAlert, CheckCircle, RefreshCw, ChevronLeft } from 'lucide-react';
 import { joinRoom, checkRoomCapacity } from '@/lib/actions';
 import { SiteLogo } from '@/components/SiteLogo';
+import { useNotification } from '@/context/NotificationContext';
 
 interface RecentRoom {
   roomId: string;
@@ -18,6 +19,7 @@ interface RecentRoom {
 function JoinForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { toast } = useNotification();
 
   const [code, setCode] = useState('');
   const [groupName, setGroupName] = useState('');
@@ -83,11 +85,15 @@ function JoinForm() {
     setError('');
 
     if (!code.trim()) {
-      setError('Please enter the room code or room ID.');
+      const msg = 'Please enter the room code or room ID.';
+      setError(msg);
+      toast.warning('Input Required', msg);
       return;
     }
     if (!groupName.trim()) {
-      setError('Please enter a group / team name.');
+      const msg = 'Please enter a group / team name.';
+      setError(msg);
+      toast.warning('Input Required', msg);
       return;
     }
 
@@ -126,13 +132,23 @@ function JoinForm() {
           // Ignore storage errors
         }
 
+        if (res.reconnected) {
+          toast.success('Reconnected', `Welcome back, ${groupName}!`);
+        } else {
+          toast.success('Team Joined', `Welcome, "${groupName}"!`);
+        }
+
         router.push(`/play/${res.roomId}`);
       } else {
-        setError(res?.error || 'Failed to join room');
+        const msg = res?.error || 'Failed to join room';
+        setError(msg);
+        toast.error('Unable to Join', msg);
         setLoading(false);
       }
     } catch (err) {
-      setError((err as Error).message || 'Failed to join room');
+      const msg = (err as Error).message || 'Failed to join room';
+      setError(msg);
+      toast.error('Join Error', msg);
       setLoading(false);
     }
   };
@@ -140,6 +156,7 @@ function JoinForm() {
   const handleQuickRejoin = (recent: RecentRoom) => {
     setCode(recent.roomCode || recent.roomId);
     setGroupName(recent.groupName);
+    toast.info('Room Selected', `Prefilled team "${recent.groupName}".`);
   };
 
   return (

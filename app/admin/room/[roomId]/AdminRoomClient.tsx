@@ -52,6 +52,7 @@ import {
 } from 'lucide-react';
 import useSWR from 'swr';
 import { SiteLogo } from '@/components/SiteLogo';
+import { useNotification } from '@/context/NotificationContext';
 
 interface AdminRoomClientProps {
   roomId: string;
@@ -59,6 +60,7 @@ interface AdminRoomClientProps {
 
 export function AdminRoomClient({ roomId }: AdminRoomClientProps) {
   const router = useRouter();
+  const { toast, confirm } = useNotification();
   const { room, contestants, board, mutate } = useGameState(roomId);
   const { data: allQuestions = [] } = useSWR(
     ['admin_questions', roomId, room?.version],
@@ -102,6 +104,7 @@ export function AdminRoomClient({ roomId }: AdminRoomClientProps) {
     if (!room?.code) return;
     navigator.clipboard.writeText(room.code);
     setCopied(true);
+    toast.success('Room Code Copied', `${room.code} copied to clipboard`);
     setTimeout(() => setCopied(false), 2000);
   };
 
@@ -110,6 +113,7 @@ export function AdminRoomClient({ roomId }: AdminRoomClientProps) {
     const url = `${window.location.origin}/join?code=${room.code}`;
     navigator.clipboard.writeText(url);
     setCopiedLink(true);
+    toast.success('Invite Link Copied', 'Direct participant URL ready to share');
     setTimeout(() => setCopiedLink(false), 2000);
   };
 
@@ -120,38 +124,52 @@ export function AdminRoomClient({ roomId }: AdminRoomClientProps) {
       await fn();
       await mutate();
     } catch (err) {
-      alert((err as Error).message);
+      toast.error('Action Failed', (err as Error).message || 'Operation could not be completed');
     } finally {
       setIsActionPending(false);
     }
   };
 
   const handleDeleteRoom = async () => {
-    const confirmed = window.confirm(
-      `Permanently delete room "${room?.name}"?\nAll questions, teams, and scores will be deleted.`
-    );
+    const confirmed = await confirm({
+      title: 'Delete Quiz Room?',
+      message: `Are you sure you want to delete "${room?.name}"? All registered teams, questions, and scores will be permanently erased.`,
+      confirmText: 'Delete Room',
+      cancelText: 'Keep Room',
+      variant: 'danger',
+      icon: 'trash',
+    });
     if (!confirmed) return;
 
     try {
       setIsActionPending(true);
       await deleteRoom(roomId);
+      toast.success('Room Deleted', `Room "${room?.name}" was deleted.`);
       router.push('/admin/login');
     } catch (err) {
-      alert((err as Error).message || 'Failed to delete room');
+      toast.error('Failed to Delete Room', (err as Error).message);
       setIsActionPending(false);
     }
   };
 
   const handleAdminLogout = async () => {
-    const confirmed = window.confirm('Log out from Host session?');
+    const confirmed = await confirm({
+      title: 'Log Out Host Session?',
+      message: 'You will need to enter your Security PIN to regain access to the Host Control Studio.',
+      confirmText: 'Log Out',
+      cancelText: 'Stay in Room',
+      variant: 'warning',
+      icon: 'logout',
+    });
     if (!confirmed) return;
 
     try {
       setIsActionPending(true);
       await logoutAdminAction();
+      toast.info('Logged Out', 'Host session has been closed.');
       router.push('/admin/login');
     } catch (err) {
-      alert((err as Error).message || 'Failed to log out');
+      toast.error('Logout Failed', (err as Error).message);
       setIsActionPending(false);
     }
   };

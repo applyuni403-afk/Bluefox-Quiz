@@ -26,9 +26,11 @@ import {
   checkAdminSessionAction,
 } from '@/lib/actions';
 import { SiteLogo } from '@/components/SiteLogo';
+import { useNotification } from '@/context/NotificationContext';
 
 export default function AdminLoginPage() {
   const router = useRouter();
+  const { toast } = useNotification();
   const [pin, setPin] = useState('');
   const [roomName, setRoomName] = useState('');
   const [rejoinCodeOrId, setRejoinCodeOrId] = useState('');
@@ -71,11 +73,16 @@ export default function AdminLoginPage() {
       const ok = await authenticateAdmin(pin);
       if (ok) {
         setIsAuthenticated(true);
+        toast.success('Authorized', 'Welcome to Host Control Hub.');
       } else {
-        setError('Invalid Admin PIN.');
+        const msg = 'Invalid Admin Security PIN.';
+        setError(msg);
+        toast.error('Authentication Error', msg);
       }
     } catch (err) {
-      setError((err as Error).message || 'Authentication error');
+      const msg = (err as Error).message || 'Authentication error';
+      setError(msg);
+      toast.error('Login Failed', msg);
     } finally {
       setLoading(false);
     }
@@ -88,8 +95,11 @@ export default function AdminLoginPage() {
       setIsAuthenticated(false);
       setPin('');
       setError('');
+      toast.info('Logged Out', 'Host session terminated.');
     } catch (err) {
-      setError((err as Error).message || 'Failed to log out');
+      const msg = (err as Error).message || 'Failed to log out';
+      setError(msg);
+      toast.error('Logout Failed', msg);
     } finally {
       setLoading(false);
     }
@@ -102,9 +112,12 @@ export default function AdminLoginPage() {
 
     try {
       const room = await createRoom(roomName || 'Bluefox Championship');
+      toast.success('Room Ready', `Studio opened for "${room.name}".`);
       router.push(`/admin/room/${room.id}`);
     } catch (err) {
-      setError((err as Error).message || 'Failed to create room');
+      const msg = (err as Error).message || 'Failed to create room';
+      setError(msg);
+      toast.error('Failed to Create Room', msg);
       setLoading(false);
     }
   };
@@ -115,6 +128,7 @@ export default function AdminLoginPage() {
     const clean = rejoinCodeOrId.trim();
     if (!clean) {
       setError('Please enter a Room ID or 6-digit Code.');
+      toast.warning('Input Required', 'Please enter a Room ID or 6-digit Code.');
       return;
     }
 
@@ -122,13 +136,18 @@ export default function AdminLoginPage() {
     try {
       const room = await findRoomByIdOrCode(clean);
       if (room) {
+        toast.success('Room Found', `Reopening "${room.name}".`);
         router.push(`/admin/room/${room.id}`);
       } else {
-        setError('No room found with this ID or Code.');
+        const msg = 'No room found with this ID or Code.';
+        setError(msg);
+        toast.error('Room Not Found', msg);
         setLoading(false);
       }
     } catch (err) {
-      setError((err as Error).message || 'Failed to find room');
+      const msg = (err as Error).message || 'Failed to find room';
+      setError(msg);
+      toast.error('Search Failed', msg);
       setLoading(false);
     }
   };
@@ -136,6 +155,7 @@ export default function AdminLoginPage() {
   const handleCopyId = (id: string) => {
     navigator.clipboard.writeText(id);
     setCopiedId(id);
+    toast.success('Room ID Copied', 'Copied to clipboard.');
     setTimeout(() => setCopiedId(null), 2000);
   };
 

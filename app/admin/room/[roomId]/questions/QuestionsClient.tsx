@@ -27,6 +27,7 @@ import {
   LogOut,
 } from 'lucide-react';
 import useSWR from 'swr';
+import { useNotification } from '@/context/NotificationContext';
 
 interface QuestionsClientProps {
   roomId: string;
@@ -34,6 +35,7 @@ interface QuestionsClientProps {
 
 export function QuestionsClient({ roomId }: QuestionsClientProps) {
   const router = useRouter();
+  const { toast, confirm: confirmModal } = useNotification();
   const { data: questions = [], isLoading: loading, mutate: mutateQuestions } = useSWR(
     ['questions_list', roomId],
     () => getRoomQuestions(roomId)
@@ -45,14 +47,22 @@ export function QuestionsClient({ roomId }: QuestionsClientProps) {
   const [filter, setFilter] = useState<'all' | 'normal' | 'rapid_fire'>('all');
 
   const handleAdminLogout = async () => {
-    const confirmed = window.confirm('Log out from Host session?');
+    const confirmed = await confirmModal({
+      title: 'Log Out Host Session?',
+      message: 'You will need to enter your Security PIN to regain access to this room.',
+      confirmText: 'Log Out',
+      cancelText: 'Stay Here',
+      variant: 'warning',
+      icon: 'logout',
+    });
     if (!confirmed) return;
 
     try {
       await logoutAdminAction();
+      toast.info('Logged Out', 'Host session has been closed.');
       router.push('/admin/login');
     } catch (err) {
-      setError((err as Error).message || 'Failed to log out');
+      toast.error('Logout Failed', (err as Error).message);
     }
   };
 
@@ -96,9 +106,12 @@ export function QuestionsClient({ roomId }: QuestionsClientProps) {
 
       setMediaUrl(data.url);
       setSuccess('Media uploaded');
+      toast.success('Media Uploaded', 'File attached to current question draft.');
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
-      setError((err as Error).message);
+      const msg = (err as Error).message;
+      setError(msg);
+      toast.error('Upload Failed', msg);
     } finally {
       setUploading(false);
     }
@@ -111,10 +124,12 @@ export function QuestionsClient({ roomId }: QuestionsClientProps) {
 
     if (!prompt.trim()) {
       setError('Prompt is required.');
+      toast.warning('Validation Error', 'Question prompt is required.');
       return;
     }
     if (!correctAnswer.trim()) {
       setError('Answer is required.');
+      toast.warning('Validation Error', 'Correct answer is required.');
       return;
     }
 
@@ -122,10 +137,12 @@ export function QuestionsClient({ roomId }: QuestionsClientProps) {
       const validOptions = mcqOptions.filter((o) => o.trim().length > 0);
       if (validOptions.length < 2) {
         setError('MCQ requires at least 2 options.');
+        toast.warning('Validation Error', 'MCQ requires at least 2 options.');
         return;
       }
       if (!validOptions.includes(correctAnswer.trim())) {
         setError('Answer must match one MCQ option.');
+        toast.warning('Validation Error', 'Correct answer must match one MCQ option.');
         return;
       }
     }
@@ -152,32 +169,51 @@ export function QuestionsClient({ roomId }: QuestionsClientProps) {
       setMcqOptions(['', '', '', '']);
       setTimerSeconds(undefined);
       setSuccess('Question saved');
+      toast.success(
+        'Question Saved',
+        `Added to ${roundType === 'rapid_fire' ? 'Rapid Fire' : 'Normal'} question bank.`
+      );
       setTimeout(() => setSuccess(''), 3000);
 
       await mutateQuestions();
     } catch (err) {
-      setError((err as Error).message);
+      const msg = (err as Error).message;
+      setError(msg);
+      toast.error('Save Failed', msg);
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Delete this question?')) return;
+  const handleDelete = async (id: string, promptText?: string) => {
+    const confirmed = await confirmModal({
+      title: 'Delete Question?',
+      message: promptText
+        ? `Are you sure you want to delete "${promptText.slice(0, 60)}..."?`
+        : 'Are you sure you want to delete this question from the bank?',
+      confirmText: 'Delete Question',
+      cancelText: 'Keep Question',
+      variant: 'danger',
+      icon: 'trash',
+    });
+    if (!confirmed) return;
+
     try {
       await deleteQuestion(id);
+      toast.success('Question Deleted', 'Removed from question bank.');
       await mutateQuestions();
     } catch (err) {
-      setError((err as Error).message);
+      toast.error('Delete Failed', (err as Error).message);
     }
   };
 
   const handleReset = async (id: string) => {
     try {
       await resetQuestionStatus(id);
+      toast.info('Status Reset', 'Question marked as unused.');
       await mutateQuestions();
     } catch (err) {
-      setError((err as Error).message);
+      toast.error('Reset Failed', (err as Error).message);
     }
   };
 
@@ -578,7 +614,7 @@ export function QuestionsClient({ roomId }: QuestionsClientProps) {
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleDelete(q.id)}
+                      onClick={() => handleDelete(q.id, q.prompt)}
                       title="Delete Question"
                       className="p-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 transition"
                     >

@@ -4,6 +4,7 @@ import { Contestant } from '@/lib/db/schema';
 import { Trophy, Users, Plus, Minus, UserPlus, Trash2, X } from 'lucide-react';
 import { adjustScore, adminAddGroup, adminRemoveGroup } from '@/lib/actions';
 import { useState } from 'react';
+import { useNotification } from '@/context/NotificationContext';
 
 interface ScoreBoardProps {
   contestants: Contestant[];
@@ -20,6 +21,7 @@ export function ScoreBoard({
   roomId,
   onMutate,
 }: ScoreBoardProps) {
+  const { toast, confirm } = useNotification();
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [isAddingGroup, setIsAddingGroup] = useState(false);
   const [newGroupName, setNewGroupName] = useState('');
@@ -35,9 +37,14 @@ export function ScoreBoard({
     try {
       setUpdatingId(contestantId);
       await adjustScore(contestantId, delta);
+      const target = groups.find((g) => g.id === contestantId);
+      toast.success(
+        delta > 0 ? `+${delta} Points` : `${delta} Points`,
+        target ? target.name : undefined
+      );
       if (onMutate) await onMutate();
     } catch (err) {
-      console.error('Failed to adjust score:', err);
+      toast.error('Failed to adjust score', (err as Error).message);
     } finally {
       setUpdatingId(null);
     }
@@ -45,17 +52,23 @@ export function ScoreBoard({
 
   const handleRemoveGroup = async (group: Contestant) => {
     if (!roomId) return;
-    const confirmed = window.confirm(
-      `Kick team "${group.name}" from this quiz session?`
-    );
+    const confirmed = await confirm({
+      title: `Kick Team "${group.name}"?`,
+      message: `This team will be removed from the quiz and their reserved slot will be freed immediately.`,
+      confirmText: 'Kick Team',
+      cancelText: 'Keep Team',
+      variant: 'danger',
+      icon: 'trash',
+    });
     if (!confirmed) return;
 
     try {
       setUpdatingId(group.id);
       await adminRemoveGroup(roomId, group.id);
+      toast.success('Team Removed', `"${group.name}" has been kicked from the quiz.`);
       if (onMutate) await onMutate();
     } catch (err) {
-      alert((err as Error).message || 'Failed to remove group');
+      toast.error('Failed to remove team', (err as Error).message);
     } finally {
       setUpdatingId(null);
     }
@@ -85,12 +98,15 @@ export function ScoreBoard({
         .filter((m) => m.length > 0);
 
       await adminAddGroup(roomId, cleanName, members);
+      toast.success('Team Registered', `"${cleanName}" joined the quiz.`);
       setNewGroupName('');
       setNewGroupMembers('');
       setIsAddingGroup(false);
       if (onMutate) await onMutate();
     } catch (err) {
-      setAddError((err as Error).message || 'Failed to add group');
+      const msg = (err as Error).message || 'Failed to add group';
+      setAddError(msg);
+      toast.error('Registration Failed', msg);
     } finally {
       setIsSubmittingGroup(false);
     }
