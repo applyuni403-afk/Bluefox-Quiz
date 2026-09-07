@@ -264,10 +264,10 @@ function JoinForm() {
   };
 
   return (
-    <div className="space-y-4">
-      <div className="bg-white/85 backdrop-blur-2xl border border-blue-100/90 rounded-3xl p-6 sm:p-8 shadow-[0_20px_50px_rgba(30,58,138,0.06)]">
+    <div className="space-y-3">
+      <div className="bg-white/85 backdrop-blur-2xl border border-blue-100/90 rounded-3xl p-5 sm:p-6 shadow-[0_15px_40px_rgba(30,58,138,0.06)]">
         {error && (
-          <div className="mb-6 p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium">
+          <div className="mb-4 p-3 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium">
             {error}
           </div>
         )}
@@ -275,7 +275,7 @@ function JoinForm() {
         {/* Live Capacity Pill Banner */}
         {capacity && capacity.exists && (
           <div
-            className={`mb-6 p-3.5 rounded-2xl border flex items-center justify-between gap-3 text-xs ${
+            className={`mb-4 p-3 rounded-2xl border flex items-center justify-between gap-3 text-xs ${
               capacity.isFull
                 ? 'bg-amber-50 border-amber-200 text-amber-800'
                 : 'bg-blue-50 border-blue-200 text-blue-800'
@@ -294,7 +294,7 @@ function JoinForm() {
                 </span>
               </div>
             </div>
-            <span className="font-mono font-black text-xs bg-white px-2.5 py-1 rounded-lg border border-blue-200 text-blue-900 shrink-0 shadow-2xs">
+            <span className="font-mono font-black text-xs bg-white px-2 py-0.5 rounded-lg border border-blue-200 text-blue-900 shrink-0 shadow-2xs">
               {capacity.groupCount} / 8
             </span>
           </div>
@@ -302,13 +302,13 @@ function JoinForm() {
 
         {/* Active Session Notification Card */}
         {activeSession && activeSession.teamName && capacity?.roomId && (
-          <div className="mb-6 p-4 rounded-2xl bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 space-y-3">
+          <div className="mb-4 p-3.5 rounded-2xl bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 space-y-2.5">
             <div className="flex items-center justify-between">
               <div>
                 <span className="text-[10px] font-black uppercase tracking-wider text-blue-600 block">
                   Active Team Session
                 </span>
-                <p className="text-sm font-black text-slate-900">
+                <p className="text-xs sm:text-sm font-black text-slate-900">
                   Connected as: <span className="text-blue-700">{activeSession.teamName}</span>
                 </p>
               </div>
@@ -317,7 +317,7 @@ function JoinForm() {
                 onClick={handleSwitchOrLogout}
                 disabled={loading}
                 title="Log out from this team session"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-rose-50 border border-blue-200 hover:border-rose-200 text-xs font-bold text-slate-700 hover:text-rose-600 transition shadow-2xs cursor-pointer"
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-white hover:bg-rose-50 border border-blue-200 hover:border-rose-200 text-xs font-bold text-slate-700 hover:text-rose-600 transition shadow-2xs cursor-pointer"
               >
                 <LogOut className="w-3.5 h-3.5" />
                 <span>Log Out</span>
@@ -326,7 +326,7 @@ function JoinForm() {
             <button
               type="button"
               onClick={() => router.push(`/play/${capacity.roomId}`)}
-              className="w-full py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs uppercase tracking-wider transition shadow-sm flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full py-2 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs uppercase tracking-wider transition shadow-sm flex items-center justify-center gap-1.5 cursor-pointer"
             >
               <span>Resume Quiz as {activeSession.teamName}</span>
               <ArrowRight className="w-3.5 h-3.5" />
@@ -334,15 +334,15 @@ function JoinForm() {
           </div>
         )}
 
-        <form onSubmit={handleJoin} className="space-y-4">
+        <form onSubmit={handleJoin} className="space-y-3.5">
           {/* Room Code or ID */}
           <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="block text-[11px] font-bold uppercase tracking-[0.15em] text-slate-500">
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-[10px] font-bold uppercase tracking-[0.15em] text-slate-500">
                 Room Code or Room ID
               </label>
               {cleanInput.length >= 4 && capacity && !capacity.exists && (
-                <span className="text-[11px] font-medium text-rose-600">Not found</span>
+                <span className="text-[10px] font-medium text-rose-600">Not found</span>
               )}
             </div>
             <input
@@ -351,24 +351,24 @@ function JoinForm() {
               value={code}
               onChange={(e) => setCode(e.target.value)}
               placeholder="e.g. BLUFOX or Room ID"
-              className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 font-mono text-base font-bold text-center transition-all shadow-2xs"
+              className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-2.5 text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 font-mono text-sm font-bold text-center transition-all shadow-2xs"
             />
           </div>
 
           {/* Group Name */}
           <div>
-            <label className="block text-[11px] font-bold uppercase tracking-[0.15em] text-slate-500 mb-1.5">
+            <label className="block text-[10px] font-bold uppercase tracking-[0.15em] text-slate-500 mb-1">
               Team Name
             </label>
             <div className="relative">
-              <Users className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+              <Users className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
                 required
                 value={groupName}
                 onChange={(e) => setGroupName(e.target.value)}
                 placeholder="e.g. Alpha Cyber"
-                className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-11 pr-4 py-3 text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 text-sm font-medium transition-all shadow-2xs"
+                className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-10 pr-4 py-2.5 text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 text-xs sm:text-sm font-medium transition-all shadow-2xs"
               />
             </div>
           </div>
@@ -376,7 +376,7 @@ function JoinForm() {
           <button
             type="submit"
             disabled={loading || !code || !groupName}
-            className="w-full flex items-center justify-center gap-2 py-3.5 px-4 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-600 hover:from-blue-700 hover:to-indigo-700 font-bold text-xs uppercase tracking-wider text-white shadow-md shadow-blue-500/25 transition-all active:scale-[0.99] disabled:opacity-40 cursor-pointer"
+            className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-600 hover:from-blue-700 hover:to-indigo-700 font-bold text-xs uppercase tracking-wider text-white shadow-md shadow-blue-500/25 transition-all active:scale-[0.99] disabled:opacity-40 cursor-pointer"
           >
             {loading ? (
               <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -393,17 +393,17 @@ function JoinForm() {
 
       {/* Quick Rejoin Recent Rooms */}
       {recentRooms.length > 0 && (
-        <div className="bg-white/70 backdrop-blur-xl border border-blue-100/80 rounded-2xl p-4 shadow-xs">
-          <span className="text-[10px] uppercase font-black tracking-wider text-slate-500 block mb-2.5">
+        <div className="bg-white/70 backdrop-blur-xl border border-blue-100/80 rounded-2xl p-3.5 shadow-xs">
+          <span className="text-[10px] uppercase font-black tracking-wider text-slate-500 block mb-2">
             Previous Sessions (Click to Rejoin)
           </span>
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 max-h-32 overflow-y-auto pr-1">
             {recentRooms.map((recent) => (
               <button
                 key={recent.roomId}
                 type="button"
                 onClick={() => handleQuickRejoin(recent)}
-                className="w-full flex items-center justify-between p-2.5 rounded-xl bg-white hover:bg-blue-50/70 border border-slate-200/80 hover:border-blue-300 text-left transition group shadow-2xs"
+                className="w-full flex items-center justify-between p-2 rounded-xl bg-white hover:bg-blue-50/70 border border-slate-200/80 hover:border-blue-300 text-left transition group shadow-2xs"
               >
                 <div className="min-w-0 pr-2">
                   <span className="font-bold text-xs text-slate-900 block truncate group-hover:text-blue-700">
@@ -413,7 +413,7 @@ function JoinForm() {
                     {recent.roomCode ? `CODE: ${recent.roomCode}` : `ID: ${recent.roomId.slice(0, 8)}...`}
                   </span>
                 </div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 bg-blue-50 px-2 py-1 rounded-lg border border-blue-200 group-hover:bg-blue-600 group-hover:text-white transition shrink-0">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 bg-blue-50 px-2 py-0.5 rounded-lg border border-blue-200 group-hover:bg-blue-600 group-hover:text-white transition shrink-0">
                   Select
                 </span>
               </button>
@@ -427,12 +427,12 @@ function JoinForm() {
 
 export default function JoinPage() {
   return (
-    <div className="min-h-screen bg-[#edf2f9] text-slate-800 flex flex-col justify-center items-center px-4 relative overflow-hidden selection:bg-blue-500/20">
+    <div className="h-screen max-h-screen overflow-hidden bg-[#edf2f9] text-slate-800 flex flex-col justify-between items-center p-3 sm:p-5 relative selection:bg-blue-500/20">
       {/* Ambient background glows */}
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-gradient-to-tr from-blue-300/30 via-indigo-200/20 to-transparent rounded-full blur-[120px] pointer-events-none" />
 
       {/* Top back shortcut */}
-      <div className="w-full max-w-md mb-6 z-10">
+      <div className="w-full max-w-md shrink-0 z-10 pt-1">
         <Link
           href="/"
           className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-900 transition-colors"
@@ -442,12 +442,12 @@ export default function JoinPage() {
         </Link>
       </div>
 
-      <div className="w-full max-w-md z-10">
+      <div className="w-full max-w-md z-10 flex-1 min-h-0 flex flex-col justify-center my-auto overflow-y-auto pr-1">
         {/* Header */}
-        <div className="text-center mb-8">
-          <SiteLogo size="lg" className="mx-auto mb-4" />
-          <h1 className="text-2xl font-black tracking-tight text-slate-900">Join Quiz</h1>
-          <p className="text-xs text-slate-500 mt-1 font-medium">
+        <div className="text-center mb-3 sm:mb-4 shrink-0">
+          <SiteLogo size="md" className="mx-auto mb-2" />
+          <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900">Join Quiz</h1>
+          <p className="text-xs text-slate-500 mt-0.5 font-medium">
             Enter 6-digit room code or Room ID to join the live session
           </p>
         </div>
@@ -464,6 +464,10 @@ export default function JoinPage() {
           <JoinForm />
         </Suspense>
       </div>
+
+      <footer className="text-center text-[10px] uppercase tracking-wider text-slate-400 py-1 shrink-0">
+        Bluefox Quiz &bull; Live Tournament
+      </footer>
     </div>
   );
 }

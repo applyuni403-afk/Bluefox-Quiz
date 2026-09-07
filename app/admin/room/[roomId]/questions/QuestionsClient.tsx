@@ -218,72 +218,71 @@ export function QuestionsClient({ roomId }: QuestionsClientProps) {
   };
 
   return (
-    <main className="min-h-screen bg-[#edf2f9] text-slate-800 p-4 sm:p-8 relative overflow-hidden flex flex-col items-center selection:bg-blue-500/20">
+    <div className="h-screen max-h-screen overflow-hidden bg-[#edf2f9] text-slate-800 p-3 sm:p-5 relative flex flex-col justify-between selection:bg-blue-500/20">
       {/* Ambient background glows */}
       <div className="absolute top-0 left-1/4 w-[600px] h-[500px] bg-blue-400/10 rounded-full blur-[140px] pointer-events-none" />
       <div className="absolute bottom-0 right-1/4 w-[500px] h-[400px] bg-indigo-400/10 rounded-full blur-[140px] pointer-events-none" />
 
-      <div className="w-full max-w-5xl space-y-6 relative z-10">
-        {/* Top Header */}
-        <header className="flex items-center justify-between gap-4 pb-4 border-b border-blue-200/60">
-          <div className="flex items-center gap-3">
-            <Link
-              href={`/admin/room/${roomId}`}
-              className="p-2.5 rounded-2xl bg-white hover:bg-slate-50 border border-blue-100 text-slate-600 hover:text-slate-900 transition shadow-2xs"
-              title="Return to Host Console"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </Link>
-            <div>
-              <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900">
-                Question Bank
-              </h1>
-              <p className="text-xs text-slate-500 font-medium">Manage quiz content & media</p>
+      {/* Top Header */}
+      <header className="w-full max-w-7xl mx-auto flex items-center justify-between gap-4 pb-3 border-b border-blue-200/60 shrink-0 z-10">
+        <div className="flex items-center gap-3">
+          <Link
+            href={`/admin/room/${roomId}`}
+            className="p-2 rounded-xl bg-white hover:bg-slate-50 border border-blue-100 text-slate-600 hover:text-slate-900 transition shadow-2xs"
+            title="Return to Host Console"
+          >
+            <ArrowLeft className="w-4 h-4" />
+          </Link>
+          <div>
+            <h1 className="text-base sm:text-lg font-black tracking-tight text-slate-900">
+              Question Bank Studio
+            </h1>
+            <p className="text-[11px] text-slate-500 font-medium">Create questions &amp; media library</p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {error && (
+            <span className="text-xs text-rose-700 bg-rose-50 px-2.5 py-1 rounded-xl border border-rose-200 font-medium hidden md:inline">
+              {error}
+            </span>
+          )}
+          {success && (
+            <span className="text-xs text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-xl border border-emerald-200 font-medium hidden md:inline">
+              {success}
+            </span>
+          )}
+
+          <Link
+            href={`/admin/room/${roomId}`}
+            className="px-3.5 py-1.5 rounded-xl bg-white hover:bg-slate-50 border border-blue-100 text-xs font-bold text-slate-700 transition shadow-2xs"
+          >
+            Host Console
+          </Link>
+          <button
+            type="button"
+            onClick={handleAdminLogout}
+            title="Log out from Host session"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-600 hover:text-rose-600 bg-white hover:bg-rose-50 border border-blue-100 hover:border-rose-200 shadow-2xs transition active:scale-95 cursor-pointer"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Logout</span>
+          </button>
+        </div>
+      </header>
+
+      {/* Main 2-Column Split Workspace */}
+      <div className="w-full max-w-7xl mx-auto flex-1 min-h-0 my-auto grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch overflow-hidden pt-3 z-10">
+        {/* Left 5 cols: Add Question Form Card */}
+        <section className="lg:col-span-5 bg-white/85 backdrop-blur-2xl border border-blue-100 rounded-3xl p-4 sm:p-5 shadow-[0_15px_40px_rgba(30,58,138,0.06)] flex flex-col overflow-hidden">
+          <div className="flex items-center gap-2 mb-3 pb-2.5 border-b border-slate-100 shrink-0">
+            <div className="w-7 h-7 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600">
+              <Plus className="w-3.5 h-3.5" />
             </div>
+            <h2 className="text-sm font-black text-slate-900">Add Question</h2>
           </div>
 
-          <div className="flex items-center gap-2">
-            <Link
-              href={`/admin/room/${roomId}`}
-              className="px-4 py-2 rounded-xl bg-white hover:bg-slate-50 border border-blue-100 text-xs font-bold text-slate-700 transition shadow-2xs"
-            >
-              Host Console
-            </Link>
-            <button
-              type="button"
-              onClick={handleAdminLogout}
-              title="Log out from Host session"
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-slate-600 hover:text-rose-600 bg-white hover:bg-rose-50 border border-blue-100 hover:border-rose-200 shadow-2xs transition active:scale-95 cursor-pointer"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Logout</span>
-            </button>
-          </div>
-        </header>
-
-        {error && (
-          <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">
-            {error}
-          </div>
-        )}
-
-        {success && (
-          <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-            <span>{success}</span>
-          </div>
-        )}
-
-        {/* Add Question Form Card */}
-        <section className="bg-white/85 backdrop-blur-2xl border border-blue-100 rounded-3xl p-6 sm:p-8 shadow-[0_20px_50px_rgba(30,58,138,0.06)]">
-          <div className="flex items-center gap-2.5 mb-6">
-            <div className="w-8 h-8 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600">
-              <Plus className="w-4 h-4" />
-            </div>
-            <h2 className="text-lg font-black text-slate-900">Add Question</h2>
-          </div>
-
-          <form onSubmit={handleCreate} className="space-y-6">
+          <form onSubmit={handleCreate} className="flex-1 min-h-0 overflow-y-auto space-y-3.5 pr-1">
             {/* Category & Format Selectors */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -525,27 +524,27 @@ export function QuestionsClient({ roomId }: QuestionsClientProps) {
         </section>
 
         {/* Question Bank List Card */}
-        <section className="bg-white/85 backdrop-blur-2xl border border-blue-100 rounded-3xl p-6 sm:p-8 shadow-[0_20px_50px_rgba(30,58,138,0.06)]">
-          <div className="flex flex-wrap items-center justify-between gap-3 mb-6 pb-4 border-b border-blue-200/60">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-xl bg-indigo-50 border border-indigo-200 flex items-center justify-center text-indigo-600">
-                <Layers className="w-4 h-4" />
+        <section className="lg:col-span-7 bg-white/85 backdrop-blur-2xl border border-blue-100 rounded-3xl p-4 sm:p-5 shadow-[0_15px_40px_rgba(30,58,138,0.06)] flex flex-col overflow-hidden">
+          <div className="flex flex-wrap items-center justify-between gap-2.5 mb-3 pb-2.5 border-b border-blue-200/60 shrink-0">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-xl bg-indigo-50 border border-indigo-200 flex items-center justify-center text-indigo-600">
+                <Layers className="w-3.5 h-3.5" />
               </div>
-              <h2 className="text-lg font-black text-slate-900">
+              <h2 className="text-sm font-black text-slate-900">
                 Questions ({questions.length})
               </h2>
             </div>
 
             {/* Filter pills */}
-            <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl border border-slate-200">
+            <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-xl border border-slate-200">
               {(['all', 'normal', 'rapid_fire'] as const).map((f) => (
                 <button
                   key={f}
                   type="button"
                   onClick={() => setFilter(f)}
-                  className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase transition ${
+                  className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase transition cursor-pointer ${
                     filter === f
-                      ? 'bg-white text-slate-900 shadow-xs'
+                      ? 'bg-white text-slate-900 shadow-2xs'
                       : 'text-slate-500 hover:text-slate-800'
                   }`}
                 >
@@ -556,36 +555,36 @@ export function QuestionsClient({ roomId }: QuestionsClientProps) {
           </div>
 
           {loading ? (
-            <div className="p-8 text-center text-slate-500 text-xs font-medium">Loading bank...</div>
+            <div className="p-8 text-center text-slate-500 text-xs font-medium my-auto">Loading bank...</div>
           ) : filteredQuestions.length === 0 ? (
-            <div className="p-8 text-center text-slate-500 text-xs font-medium">
-              No questions found. Add some above.
+            <div className="p-8 text-center text-slate-500 text-xs font-medium my-auto bg-slate-50/70 rounded-2xl border border-dashed border-slate-200">
+              No questions found. Add some on the left.
             </div>
           ) : (
-            <div className="space-y-2.5">
+            <div className="flex-1 min-h-0 overflow-y-auto space-y-2 pr-1">
               {filteredQuestions.map((q) => (
                 <div
                   key={q.id}
-                  className="p-4 rounded-2xl bg-white hover:bg-slate-50/80 border border-blue-100 hover:border-blue-300 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all duration-200 shadow-2xs"
+                  className="p-3 rounded-2xl bg-white hover:bg-slate-50/80 border border-blue-100 hover:border-blue-300 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 transition shadow-2xs"
                 >
-                  <div className="space-y-1 min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="px-2 py-0.5 rounded-md text-[9px] font-black uppercase bg-slate-100 text-slate-700 border border-slate-200">
+                  <div className="space-y-0.5 min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-1.5 mb-0.5">
+                      <span className="px-1.5 py-0.2 rounded text-[8px] font-black uppercase bg-slate-100 text-slate-700 border border-slate-200">
                         {q.qtype}
                       </span>
-                      <span className="px-2 py-0.5 rounded-md text-[9px] font-black uppercase bg-blue-50 text-blue-700 border border-blue-200">
+                      <span className="px-1.5 py-0.2 rounded text-[8px] font-black uppercase bg-blue-50 text-blue-700 border border-blue-200">
                         {q.roundType === 'rapid_fire' ? `#${q.number}` : 'Normal'}
                       </span>
-                      <span className="text-[11px] font-black text-indigo-600">
+                      <span className="text-[10px] font-black text-indigo-600">
                         {q.points} PTS
                       </span>
                       {q.timerSeconds && (
-                        <span className="text-[11px] text-slate-500 font-mono">
+                        <span className="text-[10px] text-slate-500 font-mono">
                           {q.timerSeconds}s
                         </span>
                       )}
                       <span
-                        className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md ${
+                        className={`text-[8px] font-black uppercase px-1.5 py-0.2 rounded ${
                           q.status === 'done'
                             ? 'bg-slate-100 text-slate-500'
                             : q.status === 'active'
@@ -597,18 +596,18 @@ export function QuestionsClient({ roomId }: QuestionsClientProps) {
                       </span>
                     </div>
 
-                    <p className="font-bold text-slate-900 text-sm truncate">{q.prompt}</p>
-                    <p className="text-xs text-emerald-700 font-semibold truncate">
+                    <p className="font-bold text-slate-900 text-xs sm:text-sm truncate">{q.prompt}</p>
+                    <p className="text-[11px] text-emerald-700 font-semibold truncate">
                       Ans: {q.correctAnswer}
                     </p>
                   </div>
 
-                  <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-center">
+                  <div className="flex items-center gap-1 shrink-0 self-end sm:self-center">
                     <button
                       type="button"
                       onClick={() => handleReset(q.id)}
                       title="Reset Status"
-                      className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 border border-slate-200 transition"
+                      className="p-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 border border-slate-200 transition cursor-pointer"
                     >
                       <RotateCcw className="w-3.5 h-3.5" />
                     </button>
@@ -616,7 +615,7 @@ export function QuestionsClient({ roomId }: QuestionsClientProps) {
                       type="button"
                       onClick={() => handleDelete(q.id, q.prompt)}
                       title="Delete Question"
-                      className="p-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 transition"
+                      className="p-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 transition cursor-pointer"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -627,7 +626,11 @@ export function QuestionsClient({ roomId }: QuestionsClientProps) {
           )}
         </section>
       </div>
-    </main>
+
+      <footer className="text-center text-[10px] uppercase tracking-wider text-slate-400 py-1 shrink-0">
+        Bluefox Quiz &bull; Question Management Studio
+      </footer>
+    </div>
   );
 }
 

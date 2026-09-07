@@ -4,13 +4,13 @@ import { SiteLogo } from '@/components/SiteLogo';
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-[#edf2f9] text-slate-800 flex flex-col justify-between selection:bg-blue-500/20 selection:text-blue-900 overflow-hidden relative">
+    <div className="h-screen max-h-screen overflow-hidden bg-[#edf2f9] text-slate-800 flex flex-col justify-between selection:bg-blue-500/20 selection:text-blue-900 relative">
       {/* Dynamic ambient soft blue lights */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-gradient-to-b from-blue-300/30 via-indigo-200/20 to-transparent blur-[140px] pointer-events-none" />
-      <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-sky-200/30 blur-[160px] pointer-events-none" />
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[350px] bg-gradient-to-b from-blue-300/30 via-indigo-200/20 to-transparent blur-[140px] pointer-events-none" />
+      <div className="absolute bottom-0 right-0 w-[400px] h-[400px] bg-sky-200/30 blur-[160px] pointer-events-none" />
 
       {/* Modern Top Navigation */}
-      <header className="border-b border-blue-200/60 bg-white/75 backdrop-blur-xl sticky top-0 z-50 px-6 py-4">
+      <header className="border-b border-blue-200/60 bg-white/75 backdrop-blur-xl shrink-0 z-50 px-6 py-3">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             <SiteLogo size="md" />
@@ -37,40 +37,40 @@ export default function Home() {
       </header>
 
       {/* Main Hero */}
-      <main className="max-w-5xl mx-auto px-6 py-16 sm:py-24 flex flex-col items-center text-center flex-1 justify-center z-10">
-        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-[0.2em] bg-blue-100/80 text-blue-700 border border-blue-200 mb-8 shadow-xs">
+      <main className="max-w-5xl mx-auto px-6 py-2 sm:py-4 flex flex-col items-center text-center flex-1 min-h-0 justify-center z-10 w-full">
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-[0.2em] bg-blue-100/80 text-blue-700 border border-blue-200 mb-3 sm:mb-4 shadow-2xs">
           <Sparkles className="w-3.5 h-3.5 text-blue-600" />
           <span>Next-Gen Competitive Quiz Experience</span>
         </div>
 
-        <h1 className="text-4xl sm:text-6xl md:text-7xl font-black tracking-tight text-slate-900 max-w-3xl leading-[1.08] mb-6">
+        <h1 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight text-slate-900 max-w-3xl leading-[1.12] mb-3">
           Precision trivia for up to{' '}
           <span className="bg-gradient-to-r from-blue-700 via-indigo-600 to-sky-600 bg-clip-text text-transparent">
             8 live teams.
           </span>
         </h1>
 
-        <p className="text-sm sm:text-base text-slate-600 max-w-xl mb-12 font-medium">
+        <p className="text-xs sm:text-sm text-slate-600 max-w-xl mb-5 sm:mb-6 font-medium">
           Synchronized countdowns, rapid-fire matrices, instant audio feedback, and full host orchestration.
         </p>
 
         {/* Action Portals */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 w-full max-w-2xl mb-16 text-left">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-xl mb-4 sm:mb-5 text-left">
           {/* Team Portal */}
           <Link
             href="/join"
-            className="group relative p-7 rounded-3xl bg-white/80 hover:bg-white backdrop-blur-xl border border-blue-100 hover:border-blue-300 hover:shadow-[0_20px_45px_rgba(59,130,246,0.12)] transition-all duration-300 shadow-[0_10px_30px_rgba(30,58,138,0.05)] flex flex-col justify-between overflow-hidden"
+            className="group relative p-5 rounded-2xl bg-white/85 hover:bg-white backdrop-blur-xl border border-blue-100 hover:border-blue-300 hover:shadow-[0_15px_35px_rgba(59,130,246,0.12)] transition-all duration-200 shadow-[0_8px_25px_rgba(30,58,138,0.04)] flex flex-col justify-between"
           >
             <div>
-              <div className="w-12 h-12 rounded-2xl bg-blue-50 border border-blue-200 text-blue-600 flex items-center justify-center font-bold mb-4 group-hover:scale-105 transition-transform shadow-xs">
-                <Play className="w-5 h-5 fill-current" />
+              <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200 text-blue-600 flex items-center justify-center font-bold mb-3 group-hover:scale-105 transition-transform shadow-2xs">
+                <Play className="w-4 h-4 fill-current" />
               </div>
-              <h3 className="text-xl font-black text-slate-900 mb-1.5">Enter Quiz</h3>
+              <h3 className="text-lg font-black text-slate-900 mb-1">Enter Quiz</h3>
               <p className="text-xs text-slate-600 leading-relaxed">
                 Connect with team code and compete on live synchronized screens.
               </p>
             </div>
-            <div className="flex items-center gap-1.5 text-blue-600 font-bold text-xs uppercase tracking-wider mt-6 group-hover:translate-x-1 transition-transform">
+            <div className="flex items-center gap-1.5 text-blue-600 font-bold text-xs uppercase tracking-wider mt-4 group-hover:translate-x-1 transition-transform">
               <span>Join Quiz</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </div>
@@ -79,18 +79,18 @@ export default function Home() {
           {/* Host Portal */}
           <Link
             href="/admin/login"
-            className="group relative p-7 rounded-3xl bg-white/80 hover:bg-white backdrop-blur-xl border border-blue-100 hover:border-amber-300 hover:shadow-[0_20px_45px_rgba(245,158,11,0.12)] transition-all duration-300 shadow-[0_10px_30px_rgba(30,58,138,0.05)] flex flex-col justify-between overflow-hidden"
+            className="group relative p-5 rounded-2xl bg-white/85 hover:bg-white backdrop-blur-xl border border-blue-100 hover:border-amber-300 hover:shadow-[0_15px_35px_rgba(245,158,11,0.12)] transition-all duration-200 shadow-[0_8px_25px_rgba(30,58,138,0.04)] flex flex-col justify-between"
           >
             <div>
-              <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center font-bold mb-4 group-hover:scale-105 transition-transform shadow-xs">
-                <Shield className="w-5 h-5" />
+              <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center font-bold mb-3 group-hover:scale-105 transition-transform shadow-2xs">
+                <Shield className="w-4 h-4" />
               </div>
-              <h3 className="text-xl font-black text-slate-900 mb-1.5">Host Command</h3>
+              <h3 className="text-lg font-black text-slate-900 mb-1">Host Command</h3>
               <p className="text-xs text-slate-600 leading-relaxed">
                 Launch questions, manage 8 teams, orchestrate timers, and score answers.
               </p>
             </div>
-            <div className="flex items-center gap-1.5 text-amber-600 font-bold text-xs uppercase tracking-wider mt-6 group-hover:translate-x-1 transition-transform">
+            <div className="flex items-center gap-1.5 text-amber-600 font-bold text-xs uppercase tracking-wider mt-4 group-hover:translate-x-1 transition-transform">
               <span>Admin Center</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </div>
@@ -98,21 +98,21 @@ export default function Home() {
         </div>
 
         {/* Feature Strip */}
-        <div className="flex flex-wrap items-center justify-center gap-3 max-w-2xl text-xs font-semibold text-slate-600">
-          <span className="px-3.5 py-1.5 rounded-full bg-white/80 border border-blue-100 flex items-center gap-1.5 shadow-xs">
+        <div className="flex flex-wrap items-center justify-center gap-2 max-w-xl text-[11px] font-semibold text-slate-600 mb-3 sm:mb-4">
+          <span className="px-3 py-1 rounded-full bg-white/85 border border-blue-100 flex items-center gap-1.5 shadow-2xs">
             <Zap className="w-3.5 h-3.5 text-amber-500" /> 8-Team Live Sync
           </span>
-          <span className="px-3.5 py-1.5 rounded-full bg-white/80 border border-blue-100 flex items-center gap-1.5 shadow-xs">
+          <span className="px-3 py-1 rounded-full bg-white/85 border border-blue-100 flex items-center gap-1.5 shadow-2xs">
             <Flame className="w-3.5 h-3.5 text-rose-500" /> Rapid Fire Matrix
           </span>
-          <span className="px-3.5 py-1.5 rounded-full bg-white/80 border border-blue-100 flex items-center gap-1.5 shadow-xs">
+          <span className="px-3 py-1 rounded-full bg-white/85 border border-blue-100 flex items-center gap-1.5 shadow-2xs">
             <Trophy className="w-3.5 h-3.5 text-emerald-500" /> Realtime Leaderboard
           </span>
         </div>
 
         {/* Support Team */}
-        <div className="mt-8 flex items-center justify-center">
-          <div className="inline-flex flex-wrap items-center justify-center gap-2 px-4 py-2 rounded-2xl bg-white/85 backdrop-blur-xl border border-blue-100/90 shadow-2xs text-xs text-slate-600">
+        <div className="flex items-center justify-center">
+          <div className="inline-flex flex-wrap items-center justify-center gap-2 px-3.5 py-1.5 rounded-xl bg-white/90 backdrop-blur-xl border border-blue-100 shadow-2xs text-[11px] text-slate-600">
             <span className="font-bold text-slate-700">Support Team:</span>
             <span>📞</span>
             <a
@@ -133,7 +133,7 @@ export default function Home() {
       </main>
 
       {/* Clean Minimal Footer */}
-      <footer className="border-t border-blue-200/50 px-6 py-5 text-center text-[11px] font-semibold text-slate-500 tracking-wider uppercase">
+      <footer className="border-t border-blue-200/50 px-6 py-2 text-center text-[10px] font-semibold text-slate-400 tracking-wider uppercase shrink-0">
         Bluefox Quiz &bull; Live Tournament Suite
       </footer>
     </div>

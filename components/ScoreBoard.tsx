@@ -106,9 +106,9 @@ export function ScoreBoard({
   };
 
   return (
-    <div className="w-full bg-white/85 backdrop-blur-2xl border border-blue-100 rounded-3xl p-5 sm:p-6 shadow-[0_20px_50px_rgba(30,58,138,0.06)]">
+    <div className="w-full h-full max-h-full flex flex-col bg-white/85 backdrop-blur-2xl border border-blue-100 rounded-3xl p-4 sm:p-5 shadow-[0_20px_50px_rgba(30,58,138,0.06)] overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between mb-4 pb-3.5 border-b border-slate-100">
+      <div className="flex items-center justify-between mb-3 pb-3 border-b border-slate-100 shrink-0">
         <div className="flex items-center gap-2">
           <Trophy className="w-4 h-4 text-amber-500" />
           <h3 className="font-black text-sm uppercase tracking-wider text-slate-900">
@@ -143,13 +143,13 @@ export function ScoreBoard({
 
       {/* Admin Add Group Button & Form */}
       {isAdmin && roomId && (
-        <div className="mb-4">
+        <div className="shrink-0 mb-3">
           {!isAddingGroup ? (
             <button
               type="button"
               disabled={groups.length >= 8}
               onClick={() => setIsAddingGroup(true)}
-              className="w-full flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-2xl border border-dashed border-blue-200 text-xs font-bold text-blue-700 hover:text-blue-800 hover:bg-blue-50/70 transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs"
+              className="w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-2xl border border-dashed border-blue-200 text-xs font-bold text-blue-700 hover:text-blue-800 hover:bg-blue-50/70 transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs"
             >
               <UserPlus className="w-3.5 h-3.5 text-blue-600" />
               <span>{groups.length >= 8 ? '8 Slots Full' : '+ Add Team'}</span>
@@ -220,7 +220,7 @@ export function ScoreBoard({
           <p className="text-xs font-semibold">No teams registered yet</p>
         </div>
       ) : (
-        <div className="space-y-2">
+        <div className="flex-1 min-h-0 overflow-y-auto space-y-2 pr-1">
           {groups.map((group, index) => {
             const isActive =
               group.id === activeContestantId ||
