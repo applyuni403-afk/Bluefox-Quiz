@@ -5,6 +5,8 @@ export interface Room {
   name: string;
   status: 'lobby' | 'playing' | 'finished';
   roundType: 'normal' | 'rapid_fire';
+  currentRoundName?: string | null; // e.g. "Round 1: General Knowledge"
+  customRounds?: string[]; // list of custom rounds setup by host
   currentQuestionId: string | null;
   activeContestantId: string | null; // whose turn (group, or individual in rapid fire)
   timerEndsAt: Date | null; // null = not running
@@ -35,6 +37,7 @@ export interface Question {
   _id: string;
   roomId: string;
   roundType: 'normal' | 'rapid_fire';
+  roundName?: string | null; // custom round name e.g. "Round 1: General Knowledge"
   number: number; // shown on rapid-fire board
   qtype: 'text' | 'mcq' | 'video' | 'audio';
   prompt: string;

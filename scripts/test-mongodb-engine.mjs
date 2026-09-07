@@ -238,13 +238,61 @@ async function runTests() {
     if (leaderboard[0].score < leaderboard[1].score) throw new Error('Leaderboard not sorted by points descending');
     console.log(`✓ Leaderboard test passed: Top team is "${leaderboard[0].name}" with ${leaderboard[0].score} pts (sorted descending)`);
 
+    // 14. Quizmaster Custom Rounds Setup & Question Round Assignment
+    const round1 = 'Round 1: General Knowledge';
+    const round2 = 'Round 2: Rapid Fire Matrix';
+    await rooms.updateOne(
+      { id: roomId },
+      { $addToSet: { customRounds: { $each: [round1, round2] } }, $inc: { version: 1 } }
+    );
+    const customQid = crypto.randomUUID();
+    await questions.insertOne({
+      id: customQid,
+      _id: customQid,
+      roomId,
+      roundType: 'normal',
+      roundName: round1,
+      number: 1,
+      qtype: 'text',
+      prompt: 'What is the highest mountain peak?',
+      options: [],
+      correctAnswer: 'Mount Everest',
+      points: 10,
+      timerSeconds: 30,
+      status: 'unused',
+    });
+    const checkRoom = await rooms.findOne({ id: roomId });
+    const checkQ = await questions.findOne({ id: customQid });
+    if (!checkRoom.customRounds?.includes(round1)) throw new Error('Failed to save custom round on room');
+    if (checkQ.roundName !== round1) throw new Error('Failed to attach roundName to question');
+    console.log(`✓ Custom Rounds Setup test passed: Room has [${checkRoom.customRounds.join(', ')}], Question tagged "${checkQ.roundName}"`);
+
+    // 15. Host Active Round Switching
+    await rooms.updateOne(
+      { id: roomId },
+      { $set: { currentRoundName: round1, roundType: 'normal' }, $inc: { version: 1 } }
+    );
+    let activeRoom = await rooms.findOne({ id: roomId });
+    if (activeRoom.currentRoundName !== round1) throw new Error('Failed to set active round');
+
+    // Switch to Rapid Fire round
+    await rooms.updateOne(
+      { id: roomId },
+      { $set: { currentRoundName: round2, roundType: 'rapid_fire' }, $inc: { version: 1 } }
+    );
+    activeRoom = await rooms.findOne({ id: roomId });
+    if (activeRoom.currentRoundName !== round2 || activeRoom.roundType !== 'rapid_fire') {
+      throw new Error('Failed to switch active round to Rapid Fire');
+    }
+    console.log(`✓ Host Active Round Switching test passed: Active round = "${activeRoom.currentRoundName}" (${activeRoom.roundType})`);
+
     // Cleanup
     await rooms.deleteOne({ id: roomId });
     await contestants.deleteMany({ roomId });
     await questions.deleteMany({ roomId });
     console.log('✓ Cleaned up integration test records.');
 
-    console.log('\nALL 13 TESTS & USER REQUIREMENTS PASSED SUCCESSFULLY! 🎉');
+    console.log('\nALL 15 TESTS & USER REQUIREMENTS PASSED SUCCESSFULLY! 🎉');
   } finally {
     await client.close();
   }

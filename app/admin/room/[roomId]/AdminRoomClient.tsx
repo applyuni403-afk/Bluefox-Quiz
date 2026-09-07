@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useGameState } from '@/lib/useGameState';
@@ -28,6 +28,7 @@ import {
   chooseRapidFireQuestion,
   getRoomQuestions,
   logoutAdminAction,
+  setRoomActiveRound,
 } from '@/lib/actions';
 import {
   Play,
@@ -47,6 +48,7 @@ import {
   Trash2,
   Radio,
   LogOut,
+  Tag,
 } from 'lucide-react';
 import useSWR from 'swr';
 import { SiteLogo } from '@/components/SiteLogo';
@@ -69,6 +71,29 @@ export function AdminRoomClient({ roomId }: AdminRoomClientProps) {
   const [copiedLink, setCopiedLink] = useState(false);
   const [selectedParentGroupId, setSelectedParentGroupId] = useState('');
   const [isActionPending, setIsActionPending] = useState(false);
+  const [bankFilter, setBankFilter] = useState<string>('all');
+
+  const configuredRounds = useMemo(() => {
+    const list = new Set<string>();
+    (room?.customRounds || []).forEach((r) => {
+      if (r && r.trim()) list.add(r.trim());
+    });
+    allQuestions.forEach((q) => {
+      if (q.roundName && q.roundName.trim()) list.add(q.roundName.trim());
+    });
+    return Array.from(list);
+  }, [room?.customRounds, allQuestions]);
+
+  const filteredBankQuestions = useMemo(() => {
+    if (bankFilter === 'all') return allQuestions;
+    if (bankFilter === 'active') {
+      if (!room?.currentRoundName) return allQuestions;
+      return allQuestions.filter((q) => q.roundName === room.currentRoundName);
+    }
+    if (bankFilter === 'normal') return allQuestions.filter((q) => q.roundType === 'normal');
+    if (bankFilter === 'rapid_fire') return allQuestions.filter((q) => q.roundType === 'rapid_fire');
+    return allQuestions.filter((q) => q.roundName === bankFilter);
+  }, [allQuestions, bankFilter, room?.currentRoundName]);
 
   // 00:00 Auto-Pass Single Authority
   const timerState = useTimer(room?.timerEndsAt);
@@ -322,36 +347,75 @@ export function AdminRoomClient({ roomId }: AdminRoomClientProps) {
             <div className="flex flex-wrap items-center justify-between gap-2.5 mb-3 pb-2.5 border-b border-slate-100">
               <div className="flex items-center gap-2">
                 <Radio className="w-4 h-4 text-blue-600 animate-pulse" />
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                  {room.roundType === 'rapid_fire' ? 'Rapid Fire Matrix' : 'Normal Quiz Round'}
-                </span>
+                <div>
+                  <span className="text-xs font-black tracking-tight text-slate-900 block">
+                    {room.currentRoundName || (room.roundType === 'rapid_fire' ? 'Rapid Fire Matrix' : 'Normal Quiz Round')}
+                  </span>
+                  {room.currentRoundName && (
+                    <span className="text-[10px] text-slate-500 font-semibold uppercase">
+                      Mode: {room.roundType === 'rapid_fire' ? 'Rapid Fire' : 'Normal'}
+                    </span>
+                  )}
+                </div>
               </div>
 
-              <div className="flex items-center gap-1.5 bg-slate-100 border border-slate-200 rounded-2xl p-1">
-                <button
-                  type="button"
-                  disabled={room.roundType === 'normal' || isActionPending}
-                  onClick={() => wrapAction(() => setRound(room.id, 'normal'))}
-                  className={`px-3 py-1 rounded-xl text-xs font-bold transition-all ${
-                    room.roundType === 'normal'
-                      ? 'bg-blue-600 text-white shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  Normal
-                </button>
-                <button
-                  type="button"
-                  disabled={room.roundType === 'rapid_fire' || isActionPending}
-                  onClick={() => wrapAction(() => setRound(room.id, 'rapid_fire'))}
-                  className={`px-3 py-1 rounded-xl text-xs font-bold transition-all ${
-                    room.roundType === 'rapid_fire'
-                      ? 'bg-amber-600 text-white shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  Rapid Fire
-                </button>
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Round Switcher Dropdown (if rounds exist) */}
+                {configuredRounds.length > 0 && (
+                  <div className="flex items-center gap-1.5 bg-indigo-50/70 border border-indigo-200 rounded-2xl px-2.5 py-1">
+                    <Tag className="w-3 h-3 text-indigo-600 shrink-0" />
+                    <select
+                      disabled={isActionPending}
+                      value={room.currentRoundName || ''}
+                      onChange={(e) => {
+                        const selected = e.target.value;
+                        wrapAction(async () => {
+                          await setRoomActiveRound(room.id, selected || null);
+                          toast.success(
+                            'Active Round Changed',
+                            selected ? `Now presenting "${selected}".` : 'Round name cleared.'
+                          );
+                        });
+                      }}
+                      className="bg-transparent text-xs font-black text-indigo-950 focus:outline-none cursor-pointer"
+                    >
+                      <option value="">-- No Named Round --</option>
+                      {configuredRounds.map((r) => (
+                        <option key={r} value={r}>
+                          {r}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {/* Normal vs Rapid Mode buttons */}
+                <div className="flex items-center gap-1.5 bg-slate-100 border border-slate-200 rounded-2xl p-1">
+                  <button
+                    type="button"
+                    disabled={room.roundType === 'normal' || isActionPending}
+                    onClick={() => wrapAction(() => setRound(room.id, 'normal'))}
+                    className={`px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      room.roundType === 'normal'
+                        ? 'bg-blue-600 text-white shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    Normal
+                  </button>
+                  <button
+                    type="button"
+                    disabled={room.roundType === 'rapid_fire' || isActionPending}
+                    onClick={() => wrapAction(() => setRound(room.id, 'rapid_fire'))}
+                    className={`px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      room.roundType === 'rapid_fire'
+                        ? 'bg-amber-600 text-white shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    Rapid Fire
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -647,28 +711,79 @@ export function AdminRoomClient({ roomId }: AdminRoomClientProps) {
 
           {/* Question Launcher Bank */}
           <div className="bg-white/85 backdrop-blur-2xl border border-blue-100 rounded-2xl p-4 shadow-2xs shrink-0">
-            <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-100">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-900">
-                Launch Bank ({allQuestions.length})
-              </span>
+            <div className="flex items-center justify-between mb-2 pb-2 border-b border-slate-100">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-900">
+                  Launch Bank ({filteredBankQuestions.length}/{allQuestions.length})
+                </span>
+              </div>
               <Link
                 href={`/admin/room/${room.id}/questions`}
                 className="text-xs font-bold text-blue-600 hover:text-blue-800"
               >
-                + Add Question
+                + Add / Manage Questions
               </Link>
             </div>
 
-            {allQuestions.length === 0 ? (
+            {/* Bank Round Filter Pills */}
+            <div className="flex flex-wrap items-center gap-1 mb-2.5 pb-2 border-b border-slate-100 overflow-x-auto">
+              <button
+                type="button"
+                onClick={() => setBankFilter('all')}
+                className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase transition cursor-pointer shrink-0 ${
+                  bankFilter === 'all'
+                    ? 'bg-blue-600 text-white shadow-2xs'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                All ({allQuestions.length})
+              </button>
+
+              {room.currentRoundName && (
+                <button
+                  type="button"
+                  onClick={() => setBankFilter('active')}
+                  className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase transition cursor-pointer shrink-0 ${
+                    bankFilter === 'active'
+                      ? 'bg-indigo-600 text-white shadow-2xs'
+                      : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200'
+                  }`}
+                >
+                  Active Round ({allQuestions.filter((q) => q.roundName === room.currentRoundName).length})
+                </button>
+              )}
+
+              {configuredRounds
+                .filter((r) => r !== room.currentRoundName)
+                .map((r) => {
+                  const count = allQuestions.filter((q) => q.roundName === r).length;
+                  return (
+                    <button
+                      key={r}
+                      type="button"
+                      onClick={() => setBankFilter(r)}
+                      className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase transition cursor-pointer shrink-0 max-w-[130px] truncate ${
+                        bankFilter === r
+                          ? 'bg-slate-800 text-white shadow-2xs'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
+                    >
+                      {r} ({count})
+                    </button>
+                  );
+                })}
+            </div>
+
+            {filteredBankQuestions.length === 0 ? (
               <div className="text-center py-4 text-slate-400 text-xs">
-                No questions added.{' '}
+                No questions found for this filter.{' '}
                 <Link href={`/admin/room/${room.id}/questions`} className="text-blue-600 underline font-semibold">
                   Add questions
                 </Link>
               </div>
             ) : (
               <div className="space-y-1.5 max-h-[220px] overflow-y-auto pr-1">
-                {allQuestions.map((q) => {
+                {filteredBankQuestions.map((q) => {
                   const isCurrent = q.id === room.currentQuestionId;
                   const isDone = q.status === 'done';
 
@@ -684,10 +799,15 @@ export function AdminRoomClient({ roomId }: AdminRoomClientProps) {
                       }`}
                     >
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5 mb-0.5">
+                        <div className="flex flex-wrap items-center gap-1.5 mb-0.5">
                           <span className="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase bg-slate-200 text-slate-700">
                             {q.qtype}
                           </span>
+                          {q.roundName && (
+                            <span className="px-1.5 py-0.2 rounded text-[8px] font-bold uppercase bg-indigo-50 text-indigo-700 border border-indigo-200 truncate max-w-[120px]">
+                              {q.roundName}
+                            </span>
+                          )}
                           <span className="text-[10px] font-black text-blue-600">
                             {q.points}p
                           </span>

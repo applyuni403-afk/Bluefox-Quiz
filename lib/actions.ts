@@ -57,6 +57,10 @@ export async function resolveRoom(codeOrIdOrName: string): Promise<Room | null> 
   return room;
 }
 
+export async function getRoom(codeOrIdOrName: string): Promise<Room | null> {
+  return resolveRoom(codeOrIdOrName);
+}
+
 // -------------------------------------------------------------
 // ROOM & LOBBY ACTIONS
 // -------------------------------------------------------------
@@ -88,6 +92,8 @@ export async function createRoom(name: string): Promise<Room> {
     code,
     status: 'lobby',
     roundType: 'normal',
+    currentRoundName: null,
+    customRounds: [],
     currentQuestionId: null,
     activeContestantId: null,
     timerEndsAt: null,
@@ -451,6 +457,87 @@ export async function setRound(roomId: string, roundType: 'normal' | 'rapid_fire
       $inc: { version: 1 },
     }
   );
+}
+
+export async function setRoomActiveRound(
+  roomId: string,
+  roundName: string | null,
+  roundType?: 'normal' | 'rapid_fire'
+) {
+  await assertAdmin();
+  const room = await resolveRoom(roomId);
+  if (!room) return;
+  const canonicalId = room.id;
+  const cleanName = roundName?.trim() || null;
+
+  let newRoundType = roundType;
+  if (!newRoundType) {
+    if (cleanName && /rapid/i.test(cleanName)) {
+      newRoundType = 'rapid_fire';
+    } else if (cleanName) {
+      newRoundType = 'normal';
+    } else {
+      newRoundType = room.roundType;
+    }
+  }
+
+  const rooms = await getRoomsCollection();
+  await rooms.updateOne(
+    { id: canonicalId },
+    {
+      $set: {
+        currentRoundName: cleanName,
+        roundType: newRoundType,
+        currentQuestionId: null,
+        timerEndsAt: null,
+        lastResult: null,
+        passCount: 0,
+      },
+      $inc: { version: 1 },
+    }
+  );
+}
+
+export async function addRoomRound(roomId: string, roundName: string): Promise<string[]> {
+  await assertAdmin();
+  const clean = roundName.trim();
+  if (!clean) throw new Error('Round name cannot be empty');
+
+  const room = await resolveRoom(roomId);
+  if (!room) throw new Error('Room not found');
+
+  const rooms = await getRoomsCollection();
+  await rooms.updateOne(
+    { id: room.id },
+    {
+      $addToSet: { customRounds: clean },
+      $inc: { version: 1 },
+    }
+  );
+
+  const updated = await rooms.findOne({ id: room.id });
+  return updated?.customRounds || [];
+}
+
+export async function deleteRoomRound(roomId: string, roundName: string): Promise<string[]> {
+  await assertAdmin();
+  const clean = roundName.trim();
+  const room = await resolveRoom(roomId);
+  if (!room) throw new Error('Room not found');
+
+  const rooms = await getRoomsCollection();
+  const updateDoc: Record<string, unknown> = {
+    $pull: { customRounds: clean },
+    $inc: { version: 1 },
+  };
+  if (room.currentRoundName === clean) {
+    updateDoc.$set = { currentRoundName: null };
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await rooms.updateOne({ id: room.id }, updateDoc as any);
+  const updated = await rooms.findOne({ id: room.id });
+  return updated?.customRounds || [];
 }
 
 export async function startGame(roomId: string) {
@@ -1025,6 +1112,7 @@ export async function creditIndividualToGroup(
 export interface CreateQuestionInput {
   roomId: string;
   roundType: 'normal' | 'rapid_fire';
+  roundName?: string;
   number?: number;
   qtype: 'text' | 'mcq' | 'video' | 'audio';
   prompt: string;
@@ -1052,12 +1140,15 @@ export async function createQuestion(data: CreateQuestionInput): Promise<Questio
     qNumber = existing.length + 1;
   }
 
+  const cleanRoundName = data.roundName?.trim() || null;
+
   const id = crypto.randomUUID();
   const question: Question = {
     id,
     _id: id,
     roomId: canonicalRoomId,
     roundType: data.roundType,
+    roundName: cleanRoundName,
     number: qNumber,
     qtype: data.qtype,
     prompt: data.prompt.trim(),
@@ -1073,7 +1164,12 @@ export async function createQuestion(data: CreateQuestionInput): Promise<Questio
   await questions.insertOne(question);
 
   const rooms = await getRoomsCollection();
-  await rooms.updateOne({ id: canonicalRoomId }, { $inc: { version: 1 } });
+  const roomUpdate: Record<string, unknown> = { $inc: { version: 1 } };
+  if (cleanRoundName) {
+    roomUpdate.$addToSet = { customRounds: cleanRoundName };
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await rooms.updateOne({ id: canonicalRoomId }, roomUpdate as any);
 
   return question;
 }
@@ -1120,11 +1216,11 @@ export async function getRoomQuestions(roomId: string): Promise<Question[]> {
   if (room) {
     return questions
       .find({ roomId: { $in: [room.id, room.code] } })
-      .sort({ roundType: 1, number: 1 })
+      .sort({ roundName: 1, roundType: 1, number: 1 })
       .toArray();
   }
   return questions
     .find({ roomId })
-    .sort({ roundType: 1, number: 1 })
+    .sort({ roundName: 1, roundType: 1, number: 1 })
     .toArray();
 }

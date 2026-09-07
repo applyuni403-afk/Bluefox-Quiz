@@ -438,9 +438,15 @@ export default function PlayRoomPage({
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="font-black text-sm sm:text-base text-slate-900 truncate max-w-xs">{room.name}</h1>
-                <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-slate-100 text-slate-700 border border-slate-200">
-                  {room.roundType === 'rapid_fire' ? 'Rapid Fire' : 'Normal'}
-                </span>
+                {room.currentRoundName ? (
+                  <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-indigo-50 text-indigo-700 border border-indigo-200 shadow-2xs">
+                    {room.currentRoundName}
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-slate-100 text-slate-700 border border-slate-200">
+                    {room.roundType === 'rapid_fire' ? 'Rapid Fire' : 'Normal Quiz'}
+                  </span>
+                )}
               </div>
               <span className="text-[10px] text-slate-500 font-mono font-semibold">
                 CODE: {room.code}

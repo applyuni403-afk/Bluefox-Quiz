@@ -9,6 +9,9 @@ import {
   resetQuestionStatus,
   getRoomQuestions,
   logoutAdminAction,
+  addRoomRound,
+  deleteRoomRound,
+  getRoom,
 } from '@/lib/actions';
 import {
   ArrowLeft,
@@ -25,6 +28,9 @@ import {
   CheckCircle2,
   Layers,
   LogOut,
+  Settings2,
+  Tag,
+  X,
 } from 'lucide-react';
 import useSWR from 'swr';
 import { useNotification } from '@/context/NotificationContext';
@@ -40,11 +46,51 @@ export function QuestionsClient({ roomId }: QuestionsClientProps) {
     ['questions_list', roomId],
     () => getRoomQuestions(roomId)
   );
+  const { data: room, mutate: mutateRoom } = useSWR(
+    ['room_data', roomId],
+    () => getRoom(roomId)
+  );
+
   const [submitting, setSubmitting] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [filter, setFilter] = useState<'all' | 'normal' | 'rapid_fire'>('all');
+  const [roundFilter, setRoundFilter] = useState<string>('all');
+
+  // Form states
+  const [roundType, setRoundType] = useState<'normal' | 'rapid_fire'>('normal');
+  const [roundName, setRoundName] = useState('');
+  const [showRoundManager, setShowRoundManager] = useState(false);
+  const [newRoundInput, setNewRoundInput] = useState('');
+  const [qtype, setQtype] = useState<'text' | 'mcq' | 'video' | 'audio'>('text');
+  const [prompt, setPrompt] = useState('');
+  const [correctAnswer, setCorrectAnswer] = useState('');
+  const [mediaUrl, setMediaUrl] = useState('');
+  const [points, setPoints] = useState(10);
+  const [timerSeconds, setTimerSeconds] = useState<number | undefined>(undefined);
+  const [rapidFireNumber, setRapidFireNumber] = useState<number | undefined>(undefined);
+
+  // MCQ options
+  const [mcqOptions, setMcqOptions] = useState<string[]>(['', '', '', '']);
+
+  // Extract all distinct configured & assigned round names
+  const configuredRounds = useMemo(() => {
+    const list = new Set<string>();
+    (room?.customRounds || []).forEach((r) => {
+      if (r && r.trim()) list.add(r.trim());
+    });
+    questions.forEach((q) => {
+      if (q.roundName && q.roundName.trim()) list.add(q.roundName.trim());
+    });
+    return Array.from(list);
+  }, [room?.customRounds, questions]);
+
+  const filteredQuestions = useMemo(() => {
+    if (roundFilter === 'all') return questions;
+    if (roundFilter === 'rapid_fire') return questions.filter((q) => q.roundType === 'rapid_fire');
+    if (roundFilter === 'normal') return questions.filter((q) => q.roundType === 'normal');
+    return questions.filter((q) => q.roundName === roundFilter);
+  }, [questions, roundFilter]);
 
   const handleAdminLogout = async () => {
     const confirmed = await confirmModal({
@@ -66,23 +112,48 @@ export function QuestionsClient({ roomId }: QuestionsClientProps) {
     }
   };
 
-  // Form states
-  const [roundType, setRoundType] = useState<'normal' | 'rapid_fire'>('normal');
-  const [qtype, setQtype] = useState<'text' | 'mcq' | 'video' | 'audio'>('text');
-  const [prompt, setPrompt] = useState('');
-  const [correctAnswer, setCorrectAnswer] = useState('');
-  const [mediaUrl, setMediaUrl] = useState('');
-  const [points, setPoints] = useState(10);
-  const [timerSeconds, setTimerSeconds] = useState<number | undefined>(undefined);
-  const [rapidFireNumber, setRapidFireNumber] = useState<number | undefined>(undefined);
+  const handleAddRound = async (name: string) => {
+    const clean = name.trim();
+    if (!clean) return;
+    try {
+      await addRoomRound(roomId, clean);
+      toast.success('Round Created', `"${clean}" has been added to room rounds.`);
+      setNewRoundInput('');
+      setRoundName(clean);
+      if (/rapid/i.test(clean)) {
+        setRoundType('rapid_fire');
+      }
+      await mutateRoom();
+    } catch (err) {
+      toast.error('Failed to Add Round', (err as Error).message);
+    }
+  };
 
-  // MCQ options
-  const [mcqOptions, setMcqOptions] = useState<string[]>(['', '', '', '']);
+  const handleDeleteRound = async (name: string) => {
+    const confirmed = await confirmModal({
+      title: 'Remove Round?',
+      message: `Are you sure you want to remove "${name}" from this room? Existing questions will remain in the question bank.`,
+      confirmText: 'Remove Round',
+      cancelText: 'Keep Round',
+      variant: 'warning',
+      icon: 'trash',
+    });
+    if (!confirmed) return;
 
-  const filteredQuestions = useMemo(() => {
-    if (filter === 'all') return questions;
-    return questions.filter((q) => q.roundType === filter);
-  }, [questions, filter]);
+    try {
+      await deleteRoomRound(roomId, name);
+      toast.info('Round Removed', `"${name}" removed from room rounds.`);
+      if (roundName === name) {
+        setRoundName('');
+      }
+      if (roundFilter === name) {
+        setRoundFilter('all');
+      }
+      await mutateRoom();
+    } catch (err) {
+      toast.error('Failed to Remove Round', (err as Error).message);
+    }
+  };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -152,6 +223,7 @@ export function QuestionsClient({ roomId }: QuestionsClientProps) {
       await createQuestion({
         roomId,
         roundType,
+        roundName: roundName.trim() || undefined,
         qtype,
         prompt,
         correctAnswer,
@@ -162,20 +234,25 @@ export function QuestionsClient({ roomId }: QuestionsClientProps) {
         number: roundType === 'rapid_fire' ? rapidFireNumber : undefined,
       });
 
-      // Reset form
+      // Reset form fields but keep roundName selected for batch question entry
       setPrompt('');
       setCorrectAnswer('');
       setMediaUrl('');
       setMcqOptions(['', '', '', '']);
       setTimerSeconds(undefined);
+      if (roundType === 'rapid_fire') {
+        setRapidFireNumber((prev) => (prev ? prev + 1 : undefined));
+      }
       setSuccess('Question saved');
       toast.success(
         'Question Saved',
-        `Added to ${roundType === 'rapid_fire' ? 'Rapid Fire' : 'Normal'} question bank.`
+        roundName.trim()
+          ? `Added to "${roundName.trim()}" round.`
+          : `Added to ${roundType === 'rapid_fire' ? 'Rapid Fire' : 'Normal'} question bank.`
       );
       setTimeout(() => setSuccess(''), 3000);
 
-      await mutateQuestions();
+      await Promise.all([mutateQuestions(), mutateRoom()]);
     } catch (err) {
       const msg = (err as Error).message;
       setError(msg);
@@ -283,11 +360,150 @@ export function QuestionsClient({ roomId }: QuestionsClientProps) {
           </div>
 
           <form onSubmit={handleCreate} className="flex-1 min-h-0 overflow-y-auto space-y-3.5 pr-1">
-            {/* Category & Format Selectors */}
+            {/* Custom Round Setup & Selection Card */}
+            <div className="p-3 rounded-2xl bg-blue-50/50 border border-blue-200/80 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <Tag className="w-3.5 h-3.5 text-blue-600" />
+                  <label className="text-[11px] font-black uppercase tracking-wider text-slate-700">
+                    Round Setup &amp; Name
+                  </label>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowRoundManager(!showRoundManager)}
+                  className="text-[10px] font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 cursor-pointer"
+                >
+                  <Settings2 className="w-3 h-3" />
+                  <span>{showRoundManager ? 'Close Setup' : 'Manage Rounds'}</span>
+                </button>
+              </div>
+
+              {/* Round Manager Drawer */}
+              {showRoundManager && (
+                <div className="p-2.5 rounded-xl bg-white border border-blue-200 space-y-2 text-xs shadow-2xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold uppercase text-slate-500">Configured Rounds</span>
+                    <span className="text-[10px] text-slate-400 font-semibold">{configuredRounds.length} round(s)</span>
+                  </div>
+
+                  {configuredRounds.length > 0 ? (
+                    <div className="flex flex-wrap gap-1.5">
+                      {configuredRounds.map((r) => (
+                        <div
+                          key={r}
+                          className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-700"
+                        >
+                          <span className="truncate max-w-[140px]">{r}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteRound(r)}
+                            title={`Delete "${r}"`}
+                            className="text-slate-400 hover:text-rose-600 cursor-pointer"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-[11px] text-slate-400 italic">No custom rounds setup yet. Add one below:</p>
+                  )}
+
+                  <div className="flex gap-1.5 pt-1 border-t border-slate-100">
+                    <input
+                      type="text"
+                      value={newRoundInput}
+                      onChange={(e) => setNewRoundInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleAddRound(newRoundInput);
+                        }
+                      }}
+                      placeholder="e.g. Round 1: General Knowledge"
+                      className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 text-xs text-slate-900 focus:outline-none focus:border-blue-500 font-medium"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleAddRound(newRoundInput)}
+                      disabled={!newRoundInput.trim()}
+                      className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition disabled:opacity-40 cursor-pointer"
+                    >
+                      + Add
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Round Input / Selector with Datalist */}
+              <div className="space-y-1.5">
+                <div className="flex gap-1.5 items-center">
+                  <input
+                    type="text"
+                    list="rounds-datalist"
+                    value={roundName}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setRoundName(val);
+                      if (/rapid/i.test(val)) {
+                        setRoundType('rapid_fire');
+                      }
+                    }}
+                    placeholder="Enter or pick round name (e.g. Round 1: General Knowledge)..."
+                    className="flex-1 bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 font-semibold shadow-2xs"
+                  />
+                  <datalist id="rounds-datalist">
+                    {configuredRounds.map((r) => (
+                      <option key={r} value={r} />
+                    ))}
+                  </datalist>
+
+                  {roundName && (
+                    <button
+                      type="button"
+                      onClick={() => setRoundName('')}
+                      className="p-2 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 text-slate-400 hover:text-slate-600 transition cursor-pointer"
+                      title="Clear round selection"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Quick Selection Chips */}
+                {configuredRounds.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-1 pt-0.5">
+                    <span className="text-[10px] text-slate-500 font-bold mr-0.5">Quick Pick:</span>
+                    {configuredRounds.map((r) => (
+                      <button
+                        key={r}
+                        type="button"
+                        onClick={() => {
+                          setRoundName(r);
+                          if (/rapid/i.test(r)) {
+                            setRoundType('rapid_fire');
+                          }
+                        }}
+                        className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition cursor-pointer ${
+                          roundName === r
+                            ? 'bg-indigo-600 text-white shadow-2xs'
+                            : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+                        }`}
+                      >
+                        {r}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Mode & Format Selectors */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">
-                  Round
+                  Round Mode
                 </label>
                 <div className="grid grid-cols-2 gap-2">
                   <button
@@ -536,21 +752,49 @@ export function QuestionsClient({ roomId }: QuestionsClientProps) {
             </div>
 
             {/* Filter pills */}
-            <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-xl border border-slate-200">
-              {(['all', 'normal', 'rapid_fire'] as const).map((f) => (
-                <button
-                  key={f}
-                  type="button"
-                  onClick={() => setFilter(f)}
-                  className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase transition cursor-pointer ${
-                    filter === f
-                      ? 'bg-white text-slate-900 shadow-2xs'
-                      : 'text-slate-500 hover:text-slate-800'
-                  }`}
-                >
-                  {f === 'rapid_fire' ? 'Rapid' : f}
-                </button>
-              ))}
+            <div className="flex flex-wrap items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200 max-w-full overflow-x-auto">
+              <button
+                type="button"
+                onClick={() => setRoundFilter('all')}
+                className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase transition cursor-pointer shrink-0 ${
+                  roundFilter === 'all'
+                    ? 'bg-white text-slate-900 shadow-2xs'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                All ({questions.length})
+              </button>
+
+              {configuredRounds.map((r) => {
+                const count = questions.filter((q) => q.roundName === r).length;
+                return (
+                  <button
+                    key={r}
+                    type="button"
+                    onClick={() => setRoundFilter(r)}
+                    className={`px-2 py-1 rounded-lg text-[9px] font-black uppercase transition cursor-pointer shrink-0 max-w-[130px] truncate ${
+                      roundFilter === r
+                        ? 'bg-white text-indigo-700 shadow-2xs'
+                        : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                    title={r}
+                  >
+                    {r} ({count})
+                  </button>
+                );
+              })}
+
+              <button
+                type="button"
+                onClick={() => setRoundFilter('rapid_fire')}
+                className={`px-2 py-1 rounded-lg text-[9px] font-black uppercase transition cursor-pointer shrink-0 ${
+                  roundFilter === 'rapid_fire'
+                    ? 'bg-white text-amber-700 shadow-2xs'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                Rapid ({questions.filter((q) => q.roundType === 'rapid_fire').length})
+              </button>
             </div>
           </div>
 
@@ -558,7 +802,7 @@ export function QuestionsClient({ roomId }: QuestionsClientProps) {
             <div className="p-8 text-center text-slate-500 text-xs font-medium my-auto">Loading bank...</div>
           ) : filteredQuestions.length === 0 ? (
             <div className="p-8 text-center text-slate-500 text-xs font-medium my-auto bg-slate-50/70 rounded-2xl border border-dashed border-slate-200">
-              No questions found. Add some on the left.
+              No questions found for this round filter. Add some on the left.
             </div>
           ) : (
             <div className="flex-1 min-h-0 overflow-y-auto space-y-2 pr-1">
@@ -572,9 +816,20 @@ export function QuestionsClient({ roomId }: QuestionsClientProps) {
                       <span className="px-1.5 py-0.2 rounded text-[8px] font-black uppercase bg-slate-100 text-slate-700 border border-slate-200">
                         {q.qtype}
                       </span>
-                      <span className="px-1.5 py-0.2 rounded text-[8px] font-black uppercase bg-blue-50 text-blue-700 border border-blue-200">
-                        {q.roundType === 'rapid_fire' ? `#${q.number}` : 'Normal'}
-                      </span>
+                      {q.roundName ? (
+                        <span className="px-1.5 py-0.2 rounded text-[8px] font-black uppercase bg-indigo-50 text-indigo-700 border border-indigo-200 truncate max-w-[150px]">
+                          {q.roundName}
+                        </span>
+                      ) : (
+                        <span className="px-1.5 py-0.2 rounded text-[8px] font-black uppercase bg-blue-50 text-blue-700 border border-blue-200">
+                          {q.roundType === 'rapid_fire' ? `#${q.number}` : 'Normal'}
+                        </span>
+                      )}
+                      {q.roundType === 'rapid_fire' && q.roundName && (
+                        <span className="px-1.5 py-0.2 rounded text-[8px] font-black uppercase bg-amber-50 text-amber-700 border border-amber-200">
+                          #{q.number}
+                        </span>
+                      )}
                       <span className="text-[10px] font-black text-indigo-600">
                         {q.points} PTS
                       </span>

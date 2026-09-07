@@ -28,6 +28,11 @@ export function QuestionCard({ question, showAnswer = false }: QuestionCardProps
             {question.qtype === 'audio' && <Volume2 className="w-3 h-3" />}
             {question.qtype.toUpperCase()}
           </span>
+          {question.roundName && (
+            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-indigo-50 text-indigo-700 border border-indigo-200 shadow-2xs">
+              {question.roundName}
+            </span>
+          )}
           {question.roundType === 'rapid_fire' && (
             <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-50 text-amber-700 border border-amber-200 shadow-2xs">
               #{question.number}

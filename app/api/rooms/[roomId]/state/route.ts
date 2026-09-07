@@ -47,6 +47,7 @@ export async function GET(
           id: q.id,
           roomId: q.roomId,
           roundType: q.roundType,
+          roundName: q.roundName || null,
           number: q.number,
           qtype: q.qtype,
           prompt: q.prompt,
