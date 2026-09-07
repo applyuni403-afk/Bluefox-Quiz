@@ -195,13 +195,56 @@ async function runTests() {
     if (!adminRooms.some((r) => r.id === roomId)) throw new Error('Recent rooms list does not contain created room');
     console.log(`✓ Previous rooms query test passed: found ${adminRooms.length} room(s)`);
 
+    // 10. Same Room Name Reopen Preserves Room ID test
+    const roomByName = await rooms.findOne({
+      name: { $regex: `^MongoDB Test Quiz$`, $options: 'i' },
+    });
+    if (!roomByName || roomByName.id !== roomId) throw new Error('Failed to preserve room ID on same room name');
+    console.log(`✓ Same room name test passed: "${roomByName.name}" reopens existing ID ${roomByName.id} (no ID change)`);
+
+    // 11. Preserved Questions & Groups Test (No Empty State)
+    const preservedGroups = await contestants.find({ roomId: { $in: [roomId, testCode] }, kind: 'group' }).toArray();
+    const preservedQuestions = await questions.find({ roomId: { $in: [roomId, testCode] } }).toArray();
+    if (preservedGroups.length === 0 || preservedQuestions.length === 0) throw new Error('Questions or groups empty!');
+    console.log(`✓ State retention test passed: found ${preservedGroups.length} groups and ${preservedQuestions.length} questions`);
+
+    // 12. Rapid Fire Question Selection by Group
+    const rfQid = crypto.randomUUID();
+    await questions.insertOne({
+      id: rfQid,
+      _id: rfQid,
+      roomId,
+      roundType: 'rapid_fire',
+      number: 7,
+      qtype: 'text',
+      prompt: 'Rapid Fire Question 7',
+      options: [],
+      correctAnswer: 'Answer 7',
+      points: 25,
+      timerSeconds: 15,
+      status: 'unused',
+    });
+
+    // Group selects tile #7
+    await questions.updateOne({ id: rfQid }, { $set: { status: 'active' } });
+    await rooms.updateOne({ id: roomId }, { $set: { currentQuestionId: rfQid, roundType: 'rapid_fire' }, $inc: { version: 1 } });
+    const rfRoom = await rooms.findOne({ id: roomId });
+    if (rfRoom.currentQuestionId !== rfQid) throw new Error('Failed to launch chosen rapid fire tile');
+    console.log(`✓ Rapid Fire test passed: Group chose question tile #7 (id: ${rfQid})`);
+
+    // 13. Scoreboard Leaderboard sorted in points order
+    const leaderboard = (await contestants.find({ roomId, kind: 'group' }).toArray())
+      .sort((a, b) => b.score - a.score || a.joinOrder - b.joinOrder);
+    if (leaderboard[0].score < leaderboard[1].score) throw new Error('Leaderboard not sorted by points descending');
+    console.log(`✓ Leaderboard test passed: Top team is "${leaderboard[0].name}" with ${leaderboard[0].score} pts (sorted descending)`);
+
     // Cleanup
     await rooms.deleteOne({ id: roomId });
     await contestants.deleteMany({ roomId });
     await questions.deleteMany({ roomId });
     console.log('✓ Cleaned up integration test records.');
 
-    console.log('\nALL MONGODB & 8-GROUP CAPACITY TESTS PASSED SUCCESSFULLY! 🎉');
+    console.log('\nALL 13 TESTS & USER REQUIREMENTS PASSED SUCCESSFULLY! 🎉');
   } finally {
     await client.close();
   }

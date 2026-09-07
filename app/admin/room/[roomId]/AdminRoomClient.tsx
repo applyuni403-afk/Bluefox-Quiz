@@ -24,6 +24,7 @@ import {
   passQuestion,
   nextTurn,
   closeQuestion,
+  startRapidFireForGroup,
   startRapidFireForIndividual,
   chooseRapidFireQuestion,
   creditIndividualToGroup,
@@ -443,15 +444,17 @@ export function AdminRoomClient({ roomId }: AdminRoomClientProps) {
                 <div className="flex items-end">
                   <button
                     type="button"
-                    disabled={!selectedParentGroupId || !selectedMemberName || isActionPending}
+                    disabled={!selectedParentGroupId || isActionPending}
                     onClick={() =>
                       wrapAction(() =>
-                        startRapidFireForIndividual(room.id, selectedParentGroupId, selectedMemberName)
+                        selectedMemberName
+                          ? startRapidFireForIndividual(room.id, selectedParentGroupId, selectedMemberName)
+                          : startRapidFireForGroup(room.id, selectedParentGroupId)
                       )
                     }
                     className="w-full py-2 px-3 rounded-xl text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white transition disabled:opacity-40 shadow-xs cursor-pointer"
                   >
-                    Activate Player
+                    {selectedMemberName ? 'Activate Player' : 'Activate Team'}
                   </button>
                 </div>
               </div>

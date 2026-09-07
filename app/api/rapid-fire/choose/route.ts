@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { getRoomsCollection, getQuestionsCollection } from '@/lib/db';
-import { chooseRapidFireQuestion } from '@/lib/actions';
+import { getQuestionsCollection, getContestantsCollection } from '@/lib/db';
+import { chooseRapidFireQuestion, resolveRoom } from '@/lib/actions';
 import { checkIsAdmin } from '@/lib/session';
 
 export async function POST(request: Request) {
@@ -15,8 +15,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const rooms = await getRoomsCollection();
-    const room = await rooms.findOne({ id: roomId });
+    const room = await resolveRoom(roomId);
 
     if (!room) {
       return NextResponse.json({ error: 'Room not found' }, { status: 404 });
@@ -33,9 +32,41 @@ export async function POST(request: Request) {
 
     // Verify contestant if not admin
     if (!isAdmin) {
-      if (!contestantId || room.activeContestantId !== contestantId) {
+      if (!contestantId) {
         return NextResponse.json(
-          { error: 'Only the active rapid-fire player may choose a question' },
+          { error: 'Only the active rapid-fire team or player may choose a question' },
+          { status: 403 }
+        );
+      }
+
+      const contestants = await getContestantsCollection();
+      const activeId = room.activeContestantId;
+
+      if (!activeId) {
+        return NextResponse.json(
+          { error: 'No contestant is currently active' },
+          { status: 400 }
+        );
+      }
+
+      const isAllowed =
+        activeId === contestantId ||
+        Boolean(
+          await contestants.findOne({
+            id: activeId,
+            parentGroupId: contestantId,
+          })
+        ) ||
+        Boolean(
+          await contestants.findOne({
+            id: contestantId,
+            parentGroupId: activeId,
+          })
+        );
+
+      if (!isAllowed) {
+        return NextResponse.json(
+          { error: 'Only the active rapid-fire team or player may choose a question' },
           { status: 403 }
         );
       }

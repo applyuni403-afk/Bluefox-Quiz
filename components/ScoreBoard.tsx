@@ -221,7 +221,11 @@ export function ScoreBoard({
       ) : (
         <div className="space-y-2">
           {groups.map((group, index) => {
-            const isActive = group.id === activeContestantId;
+            const isActive =
+              group.id === activeContestantId ||
+              contestants.some(
+                (c) => c.id === activeContestantId && c.parentGroupId === group.id
+              );
             const isUpdating = updatingId === group.id;
 
             return (

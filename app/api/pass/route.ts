@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getRoomsCollection } from '@/lib/db';
-import { passQuestion } from '@/lib/actions';
+import { passQuestion, resolveRoom } from '@/lib/actions';
 
 export async function POST(request: Request) {
   try {
@@ -14,8 +13,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const rooms = await getRoomsCollection();
-    const room = await rooms.findOne({ id: roomId });
+    const room = await resolveRoom(roomId);
 
     if (!room) {
       return NextResponse.json({ error: 'Room not found' }, { status: 404 });
@@ -41,7 +39,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const result = await passQuestion(roomId);
+    const result = await passQuestion(room.id);
 
     return NextResponse.json({ success: true, result });
   } catch (error) {

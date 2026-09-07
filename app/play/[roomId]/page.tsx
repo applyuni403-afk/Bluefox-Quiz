@@ -37,17 +37,25 @@ export default function PlayRoomPage({
   useEffect(() => {
     const stored =
       localStorage.getItem(`bluefox_contestant_${roomId}`) ||
+      (room?.id ? localStorage.getItem(`bluefox_contestant_${room.id}`) : null) ||
+      (room?.code ? localStorage.getItem(`bluefox_contestant_${room.code}`) : null) ||
       localStorage.getItem('bluefox_last_contestant_id');
     if (stored) {
       const timer = setTimeout(() => setMyContestantId(stored), 0);
       return () => clearTimeout(timer);
     }
-  }, [roomId]);
+  }, [roomId, room?.id, room?.code]);
 
   const activeContestant = contestants.find((c) => c.id === room?.activeContestantId);
-  const myContestant = contestants.find((c) => c.id === myContestantId);
+  const myContestant = contestants.find(
+    (c) => c.id === myContestantId || (myContestantId && c.parentGroupId === myContestantId)
+  );
   const isMyTurn = Boolean(
-    myContestantId && room?.activeContestantId && myContestantId === room.activeContestantId
+    myContestantId &&
+      room?.activeContestantId &&
+      (myContestantId === room.activeContestantId ||
+        activeContestant?.parentGroupId === myContestantId ||
+        (myContestant?.parentGroupId && myContestant.parentGroupId === room.activeContestantId))
   );
 
   // Check if this player was kicked by host
@@ -66,7 +74,7 @@ export default function PlayRoomPage({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          roomId,
+          roomId: room?.id || roomId,
           contestantId: myContestantId,
         }),
       });
@@ -91,7 +99,7 @@ export default function PlayRoomPage({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          roomId,
+          roomId: room?.id || roomId,
           questionId,
           contestantId: myContestantId,
         }),

@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import {
-  getRoomsCollection,
   getContestantsCollection,
   getQuestionsCollection,
 } from '@/lib/db';
+import { resolveRoom } from '@/lib/actions';
 
 export async function GET(
   _request: Request,
@@ -11,17 +11,17 @@ export async function GET(
 ) {
   try {
     const { roomId } = await params;
-
-    const rooms = await getRoomsCollection();
-    const room = await rooms.findOne({ id: roomId });
+    const room = await resolveRoom(roomId);
 
     if (!room) {
       return NextResponse.json({ error: 'Room not found' }, { status: 404 });
     }
 
+    const roomIds = [room.id, room.code].filter(Boolean) as string[];
+
     const contestants = await getContestantsCollection();
     const cs = await contestants
-      .find({ roomId: room.id })
+      .find({ roomId: { $in: roomIds } })
       .sort({ joinOrder: 1 })
       .toArray();
 
@@ -34,7 +34,7 @@ export async function GET(
       room.roundType === 'rapid_fire'
         ? await questions
             .find(
-              { roomId: room.id, roundType: 'rapid_fire' },
+              { roomId: { $in: roomIds }, roundType: 'rapid_fire' },
               { projection: { id: 1, number: 1, status: 1 } }
             )
             .sort({ number: 1 })

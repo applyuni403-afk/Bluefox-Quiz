@@ -101,6 +101,12 @@ function JoinForm() {
 
       if (res?.success && res.roomId && res.contestantId) {
         localStorage.setItem(`bluefox_contestant_${res.roomId}`, res.contestantId);
+        if (capacity?.code) {
+          localStorage.setItem(`bluefox_contestant_${capacity.code}`, res.contestantId);
+        }
+        if (code.trim()) {
+          localStorage.setItem(`bluefox_contestant_${code.trim()}`, res.contestantId);
+        }
         localStorage.setItem('bluefox_last_contestant_id', res.contestantId);
         localStorage.setItem('bluefox_last_room_id', res.roomId);
 
@@ -132,7 +138,7 @@ function JoinForm() {
   };
 
   const handleQuickRejoin = (recent: RecentRoom) => {
-    setCode(recent.roomId);
+    setCode(recent.roomCode || recent.roomId);
     setGroupName(recent.groupName);
   };
 
