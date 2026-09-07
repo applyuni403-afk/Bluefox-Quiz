@@ -1,19 +1,66 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Shield, KeyRound, ArrowRight, PlusCircle, Sparkles, ChevronLeft, Lock } from 'lucide-react';
-import { authenticateAdmin, createRoom } from '@/lib/actions';
+import useSWR from 'swr';
+import {
+  Shield,
+  KeyRound,
+  ArrowRight,
+  PlusCircle,
+  Sparkles,
+  ChevronLeft,
+  Lock,
+  LogOut,
+  RotateCcw,
+  Check,
+  Copy,
+} from 'lucide-react';
+import {
+  authenticateAdmin,
+  createRoom,
+  getAdminRooms,
+  findRoomByIdOrCode,
+  logoutAdminAction,
+  checkAdminSessionAction,
+} from '@/lib/actions';
 import { SiteLogo } from '@/components/SiteLogo';
 
 export default function AdminLoginPage() {
   const router = useRouter();
   const [pin, setPin] = useState('');
   const [roomName, setRoomName] = useState('');
+  const [rejoinCodeOrId, setRejoinCodeOrId] = useState('');
+  const [activeTab, setActiveTab] = useState<'create' | 'rejoin'>('create');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  // Check if session cookie is already valid
+  useEffect(() => {
+    let mounted = true;
+    checkAdminSessionAction()
+      .then((isAdmin) => {
+        if (mounted && isAdmin) {
+          setIsAuthenticated(true);
+        }
+      })
+      .finally(() => {
+        if (mounted) setCheckingSession(false);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  // Fetch previous rooms once authenticated
+  const { data: previousRooms = [], mutate: mutateRooms, isLoading: loadingRooms } = useSWR(
+    isAuthenticated ? 'admin_rooms' : null,
+    getAdminRooms
+  );
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,6 +81,20 @@ export default function AdminLoginPage() {
     }
   };
 
+  const handleLogout = async () => {
+    setLoading(true);
+    try {
+      await logoutAdminAction();
+      setIsAuthenticated(false);
+      setPin('');
+      setError('');
+    } catch (err) {
+      setError((err as Error).message || 'Failed to log out');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleCreateRoom = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -48,14 +109,44 @@ export default function AdminLoginPage() {
     }
   };
 
+  const handleRejoinRoom = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    const clean = rejoinCodeOrId.trim();
+    if (!clean) {
+      setError('Please enter a Room ID or 6-digit Code.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const room = await findRoomByIdOrCode(clean);
+      if (room) {
+        router.push(`/admin/room/${room.id}`);
+      } else {
+        setError('No room found with this ID or Code.');
+        setLoading(false);
+      }
+    } catch (err) {
+      setError((err as Error).message || 'Failed to find room');
+      setLoading(false);
+    }
+  };
+
+  const handleCopyId = (id: string) => {
+    navigator.clipboard.writeText(id);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
   return (
-    <div className="min-h-screen bg-[#edf2f9] text-slate-800 flex flex-col justify-center items-center px-4 relative overflow-hidden selection:bg-blue-500/20">
+    <div className="min-h-screen bg-[#edf2f9] text-slate-800 flex flex-col justify-center items-center px-4 py-12 relative overflow-hidden selection:bg-blue-500/20">
       {/* Ambient background glows */}
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-gradient-to-tr from-blue-300/30 via-indigo-200/20 to-transparent rounded-full blur-[120px] pointer-events-none" />
       <div className="absolute bottom-10 right-10 w-96 h-96 bg-sky-200/30 rounded-full blur-[100px] pointer-events-none" />
 
       {/* Top back shortcut */}
-      <div className="w-full max-w-md mb-6 z-10">
+      <div className="w-full max-w-xl mb-6 z-10">
         <Link
           href="/"
           className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-900 transition-colors"
@@ -65,28 +156,36 @@ export default function AdminLoginPage() {
         </Link>
       </div>
 
-      <div className="w-full max-w-md z-10">
+      <div className="w-full max-w-xl z-10">
         {/* Header */}
         <div className="text-center mb-8">
           <SiteLogo size="lg" className="mx-auto mb-4" />
           <h1 className="text-2xl font-black tracking-tight text-slate-900">
-            {isAuthenticated ? 'Create Quiz Room' : 'Host Portal'}
+            {isAuthenticated ? 'Host Control Hub' : 'Host Portal'}
           </h1>
           <p className="text-xs text-slate-500 mt-1 font-medium">
-            {isAuthenticated ? 'Configure your session & launch live command center' : 'Enter security PIN to continue'}
+            {isAuthenticated
+              ? 'Launch a new session or rejoin an existing quiz room'
+              : 'Enter security PIN to continue'}
           </p>
         </div>
 
         {/* Card */}
-        <div className="bg-white/85 backdrop-blur-2xl border border-blue-100/90 rounded-3xl p-6 sm:p-8 shadow-[0_20px_50px_rgba(30,58,138,0.06)]">
+        <div className="bg-white/85 backdrop-blur-2xl border border-blue-100/90 rounded-3xl p-6 sm:p-8 shadow-[0_20px_50px_rgba(30,58,138,0.06)] space-y-6">
           {error && (
-            <div className="mb-6 p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium flex items-center gap-2">
+            <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium flex items-center gap-2">
               <Lock className="w-3.5 h-3.5 shrink-0" />
               <span>{error}</span>
             </div>
           )}
 
-          {!isAuthenticated ? (
+          {checkingSession ? (
+            <div className="py-12 text-center text-slate-500 text-xs font-medium">
+              <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+              <span>Checking session...</span>
+            </div>
+          ) : !isAuthenticated ? (
+            /* PIN Login Form */
             <form onSubmit={handleLogin} className="space-y-5">
               <div>
                 <label className="block text-[11px] font-bold uppercase tracking-[0.15em] text-slate-500 mb-2">
@@ -122,42 +221,209 @@ export default function AdminLoginPage() {
               </button>
             </form>
           ) : (
-            <form onSubmit={handleCreateRoom} className="space-y-5">
-              <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center gap-2">
-                <Sparkles className="w-4 h-4 shrink-0 text-emerald-600" />
-                <span>Host access unlocked</span>
+            /* Authenticated Admin Dashboard */
+            <div className="space-y-6">
+              {/* Top Host Status & Logout Bar */}
+              <div className="flex items-center justify-between pb-4 border-b border-slate-100 gap-3">
+                <div className="flex items-center gap-2 text-xs font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-full">
+                  <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Host Authorized</span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  disabled={loading}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-600 border border-slate-200 hover:border-rose-200 text-xs font-bold transition shadow-2xs cursor-pointer"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span>Log Out</span>
+                </button>
               </div>
 
-              <div>
-                <label className="block text-[11px] font-bold uppercase tracking-[0.15em] text-slate-500 mb-2">
-                  Room Name
-                </label>
-                <input
-                  type="text"
-                  autoFocus
-                  value={roomName}
-                  onChange={(e) => setRoomName(e.target.value)}
-                  placeholder="e.g. Annual Champions League"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3.5 text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 text-sm font-medium transition-all shadow-2xs"
-                />
+              {/* Action Segment Switcher */}
+              <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-2xl border border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveTab('create');
+                    setError('');
+                  }}
+                  className={`py-2 px-3 rounded-xl text-xs font-black transition flex items-center justify-center gap-2 ${
+                    activeTab === 'create'
+                      ? 'bg-white text-slate-900 shadow-xs'
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  <PlusCircle className="w-3.5 h-3.5" />
+                  <span>New Quiz Room</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveTab('rejoin');
+                    setError('');
+                  }}
+                  className={`py-2 px-3 rounded-xl text-xs font-black transition flex items-center justify-center gap-2 ${
+                    activeTab === 'rejoin'
+                      ? 'bg-white text-slate-900 shadow-xs'
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Rejoin by ID / Code</span>
+                </button>
               </div>
 
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full flex items-center justify-center gap-2 py-3.5 px-4 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 font-bold text-xs uppercase tracking-wider text-white shadow-md shadow-emerald-500/25 transition-all active:scale-[0.99] disabled:opacity-50 cursor-pointer"
-              >
-                {loading ? (
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              {activeTab === 'create' ? (
+                /* Create Room Form */
+                <form onSubmit={handleCreateRoom} className="space-y-4">
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-[0.15em] text-slate-500 mb-1.5">
+                      Quiz Room Name
+                    </label>
+                    <input
+                      type="text"
+                      autoFocus
+                      value={roomName}
+                      onChange={(e) => setRoomName(e.target.value)}
+                      placeholder="e.g. Annual Champions League"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 text-sm font-medium transition-all shadow-2xs"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full flex items-center justify-center gap-2 py-3.5 px-4 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-600 hover:from-blue-700 hover:to-indigo-700 font-bold text-xs uppercase tracking-wider text-white shadow-md shadow-blue-500/25 transition-all active:scale-[0.99] disabled:opacity-50 cursor-pointer"
+                  >
+                    {loading ? (
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <>
+                        <PlusCircle className="w-4 h-4" />
+                        <span>Create &amp; Launch Studio</span>
+                        <ArrowRight className="w-4 h-4" />
+                      </>
+                    )}
+                  </button>
+                </form>
+              ) : (
+                /* Rejoin by ID or Code Form */
+                <form onSubmit={handleRejoinRoom} className="space-y-4">
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-[0.15em] text-slate-500 mb-1.5">
+                      Room ID or 6-Digit Code
+                    </label>
+                    <input
+                      type="text"
+                      autoFocus
+                      value={rejoinCodeOrId}
+                      onChange={(e) => setRejoinCodeOrId(e.target.value)}
+                      placeholder="e.g. BLUFOX or 62473eb5-..."
+                      className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 font-mono text-sm font-bold text-center transition-all shadow-2xs"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={loading || !rejoinCodeOrId.trim()}
+                    className="w-full flex items-center justify-center gap-2 py-3.5 px-4 rounded-2xl bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 font-bold text-xs uppercase tracking-wider text-white shadow-md shadow-indigo-500/25 transition-all active:scale-[0.99] disabled:opacity-50 cursor-pointer"
+                  >
+                    {loading ? (
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <>
+                        <RotateCcw className="w-4 h-4" />
+                        <span>Rejoin Room Console</span>
+                        <ArrowRight className="w-4 h-4" />
+                      </>
+                    )}
+                  </button>
+                </form>
+              )}
+
+              {/* Previous Rooms List */}
+              <div className="pt-4 border-t border-slate-100">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-[11px] uppercase font-bold tracking-[0.15em] text-slate-500">
+                    Previous Rooms ({previousRooms.length})
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => mutateRooms()}
+                    className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 transition"
+                  >
+                    Refresh
+                  </button>
+                </div>
+
+                {loadingRooms ? (
+                  <div className="p-6 text-center text-slate-400 text-xs font-medium">
+                    Loading previous rooms...
+                  </div>
+                ) : previousRooms.length === 0 ? (
+                  <div className="p-6 text-center text-slate-400 text-xs font-medium bg-slate-50/70 rounded-2xl border border-dashed border-slate-200">
+                    No previous rooms found. Create one above!
+                  </div>
                 ) : (
-                  <>
-                    <PlusCircle className="w-4 h-4" />
-                    <span>Create &amp; Launch</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </>
+                  <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                    {previousRooms.map((r) => (
+                      <div
+                        key={r.id}
+                        className="p-3.5 rounded-2xl bg-white hover:bg-blue-50/50 border border-slate-200/80 hover:border-blue-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition shadow-2xs"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-extrabold text-sm text-slate-900 truncate">
+                              {r.name}
+                            </span>
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${
+                                r.status === 'playing'
+                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                  : r.status === 'finished'
+                                  ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                                  : 'bg-blue-50 text-blue-700 border border-blue-200'
+                              }`}
+                            >
+                              {r.status}
+                            </span>
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
+                            <span className="font-mono font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
+                              {r.code}
+                            </span>
+                            <span className="text-slate-300">&bull;</span>
+                            <button
+                              type="button"
+                              onClick={() => handleCopyId(r.id)}
+                              title="Copy Room ID"
+                              className="font-mono text-[10px] text-slate-400 hover:text-slate-700 flex items-center gap-1 transition"
+                            >
+                              <span>ID: {r.id.slice(0, 8)}...</span>
+                              {copiedId === r.id ? (
+                                <Check className="w-3 h-3 text-emerald-600" />
+                              ) : (
+                                <Copy className="w-3 h-3" />
+                              )}
+                            </button>
+                          </div>
+                        </div>
+
+                        <Link
+                          href={`/admin/room/${r.id}`}
+                          className="self-end sm:self-center px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs uppercase tracking-wider shadow-xs transition active:scale-95 shrink-0"
+                        >
+                          Reopen
+                        </Link>
+                      </div>
+                    ))}
+                  </div>
                 )}
-              </button>
-            </form>
+              </div>
+            </div>
           )}
         </div>
       </div>

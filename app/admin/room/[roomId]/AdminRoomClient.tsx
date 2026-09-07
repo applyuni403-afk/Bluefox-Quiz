@@ -28,6 +28,7 @@ import {
   chooseRapidFireQuestion,
   creditIndividualToGroup,
   getRoomQuestions,
+  logoutAdminAction,
 } from '@/lib/actions';
 import {
   Play,
@@ -46,6 +47,7 @@ import {
   Link2,
   Trash2,
   Radio,
+  LogOut,
 } from 'lucide-react';
 import useSWR from 'swr';
 import { SiteLogo } from '@/components/SiteLogo';
@@ -135,6 +137,20 @@ export function AdminRoomClient({ roomId }: AdminRoomClientProps) {
       router.push('/admin/login');
     } catch (err) {
       alert((err as Error).message || 'Failed to delete room');
+      setIsActionPending(false);
+    }
+  };
+
+  const handleAdminLogout = async () => {
+    const confirmed = window.confirm('Log out from Host session?');
+    if (!confirmed) return;
+
+    try {
+      setIsActionPending(true);
+      await logoutAdminAction();
+      router.push('/admin/login');
+    } catch (err) {
+      alert((err as Error).message || 'Failed to log out');
       setIsActionPending(false);
     }
   };
@@ -270,6 +286,18 @@ export function AdminRoomClient({ roomId }: AdminRoomClientProps) {
               className="p-1.5 rounded-xl text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition active:scale-95 disabled:opacity-40 cursor-pointer"
             >
               <Trash2 className="w-4 h-4" />
+            </button>
+
+            {/* Admin Logout Button */}
+            <button
+              type="button"
+              disabled={isActionPending}
+              onClick={handleAdminLogout}
+              title="Log out from Host session"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-600 hover:text-rose-600 bg-white hover:bg-rose-50 border border-slate-200 hover:border-rose-200 shadow-2xs transition active:scale-95 disabled:opacity-40 cursor-pointer"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Logout</span>
             </button>
           </div>
         </div>

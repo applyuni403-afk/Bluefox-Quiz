@@ -184,6 +184,17 @@ async function runTests() {
     if (refilled.length !== 8) throw new Error('Failed to refill 8th slot');
     console.log(`✓ Successfully filled freed slot back to 8/8 groups`);
 
+    // 9. Rejoin by Room ID and Previous Rooms Query test
+    const foundById = await rooms.findOne({
+      $or: [{ code: testCode }, { id: roomId }, { _id: roomId }],
+    });
+    if (!foundById || foundById.id !== roomId) throw new Error('Failed to find room by Room ID');
+    console.log(`✓ Rejoin by Room ID test passed: found room "${foundById.name}" using UUID ${roomId}`);
+
+    const adminRooms = await rooms.find({}).sort({ createdAt: -1 }).limit(10).toArray();
+    if (!adminRooms.some((r) => r.id === roomId)) throw new Error('Recent rooms list does not contain created room');
+    console.log(`✓ Previous rooms query test passed: found ${adminRooms.length} room(s)`);
+
     // Cleanup
     await rooms.deleteOne({ id: roomId });
     await contestants.deleteMany({ roomId });

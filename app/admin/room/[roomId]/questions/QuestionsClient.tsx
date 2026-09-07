@@ -2,11 +2,13 @@
 
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   createQuestion,
   deleteQuestion,
   resetQuestionStatus,
   getRoomQuestions,
+  logoutAdminAction,
 } from '@/lib/actions';
 import {
   ArrowLeft,
@@ -22,6 +24,7 @@ import {
   Flame,
   CheckCircle2,
   Layers,
+  LogOut,
 } from 'lucide-react';
 import useSWR from 'swr';
 
@@ -30,6 +33,7 @@ interface QuestionsClientProps {
 }
 
 export function QuestionsClient({ roomId }: QuestionsClientProps) {
+  const router = useRouter();
   const { data: questions = [], isLoading: loading, mutate: mutateQuestions } = useSWR(
     ['questions_list', roomId],
     () => getRoomQuestions(roomId)
@@ -39,6 +43,18 @@ export function QuestionsClient({ roomId }: QuestionsClientProps) {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [filter, setFilter] = useState<'all' | 'normal' | 'rapid_fire'>('all');
+
+  const handleAdminLogout = async () => {
+    const confirmed = window.confirm('Log out from Host session?');
+    if (!confirmed) return;
+
+    try {
+      await logoutAdminAction();
+      router.push('/admin/login');
+    } catch (err) {
+      setError((err as Error).message || 'Failed to log out');
+    }
+  };
 
   // Form states
   const [roundType, setRoundType] = useState<'normal' | 'rapid_fire'>('normal');
@@ -190,12 +206,23 @@ export function QuestionsClient({ roomId }: QuestionsClientProps) {
             </div>
           </div>
 
-          <Link
-            href={`/admin/room/${roomId}`}
-            className="px-4 py-2 rounded-xl bg-white hover:bg-slate-50 border border-blue-100 text-xs font-bold text-slate-700 transition shadow-2xs"
-          >
-            Host Console
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link
+              href={`/admin/room/${roomId}`}
+              className="px-4 py-2 rounded-xl bg-white hover:bg-slate-50 border border-blue-100 text-xs font-bold text-slate-700 transition shadow-2xs"
+            >
+              Host Console
+            </Link>
+            <button
+              type="button"
+              onClick={handleAdminLogout}
+              title="Log out from Host session"
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-slate-600 hover:text-rose-600 bg-white hover:bg-rose-50 border border-blue-100 hover:border-rose-200 shadow-2xs transition active:scale-95 cursor-pointer"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Logout</span>
+            </button>
+          </div>
         </header>
 
         {error && (

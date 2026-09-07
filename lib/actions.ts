@@ -70,7 +70,7 @@ export async function createRoom(name: string): Promise<Room> {
 }
 
 export async function joinRoom(
-  code: string,
+  codeOrId: string,
   groupName: string,
   rawMembers: string[] = []
 ): Promise<{
@@ -83,12 +83,19 @@ export async function joinRoom(
   reconnected?: boolean;
 }> {
   try {
-    const cleanCode = code.trim().toUpperCase();
+    const cleanInput = codeOrId.trim();
     const rooms = await getRoomsCollection();
-    const room = await rooms.findOne({ code: cleanCode });
+    const room = await rooms.findOne({
+      $or: [
+        { code: cleanInput.toUpperCase() },
+        { id: cleanInput },
+        { id: cleanInput.toLowerCase() },
+        { _id: cleanInput },
+      ],
+    });
 
     if (!room) {
-      return { success: false, error: 'Room not found. Please check the 6-character code.' };
+      return { success: false, error: 'Room not found. Please check the code or room ID.' };
     }
 
     const cleanGroupName = groupName.trim();
@@ -164,13 +171,20 @@ export async function joinRoom(
   }
 }
 
-export async function checkRoomCapacity(code: string) {
-  const cleanCode = code.trim().toUpperCase();
-  if (cleanCode.length !== 6) return null;
+export async function checkRoomCapacity(codeOrId: string) {
+  const clean = codeOrId.trim();
+  if (clean.length < 4) return null;
 
   try {
     const rooms = await getRoomsCollection();
-    const room = await rooms.findOne({ code: cleanCode });
+    const room = await rooms.findOne({
+      $or: [
+        { code: clean.toUpperCase() },
+        { id: clean },
+        { id: clean.toLowerCase() },
+        { _id: clean },
+      ],
+    });
 
     if (!room) return { exists: false };
 
@@ -182,6 +196,7 @@ export async function checkRoomCapacity(code: string) {
     return {
       exists: true,
       roomId: room.id,
+      code: room.code,
       name: room.name,
       status: room.status,
       groupCount: groups.length,
@@ -191,6 +206,38 @@ export async function checkRoomCapacity(code: string) {
   } catch {
     return { exists: false };
   }
+}
+
+export async function getAdminRooms(): Promise<Room[]> {
+  await assertAdmin();
+  const rooms = await getRoomsCollection();
+  const list = await rooms.find({}).sort({ createdAt: -1 }).limit(30).toArray();
+  return list.map((r) => ({
+    ...r,
+    _id: r.id,
+    createdAt: r.createdAt ? new Date(r.createdAt) : new Date(),
+  }));
+}
+
+export async function findRoomByIdOrCode(codeOrId: string): Promise<Room | null> {
+  await assertAdmin();
+  const clean = codeOrId.trim();
+  if (!clean) return null;
+  const rooms = await getRoomsCollection();
+  const room = await rooms.findOne({
+    $or: [
+      { code: clean.toUpperCase() },
+      { id: clean },
+      { id: clean.toLowerCase() },
+      { _id: clean },
+    ],
+  });
+  if (!room) return null;
+  return {
+    ...room,
+    _id: room.id,
+    createdAt: room.createdAt ? new Date(room.createdAt) : new Date(),
+  };
 }
 
 export async function adminAddGroup(
