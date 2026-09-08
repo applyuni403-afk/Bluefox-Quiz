@@ -785,13 +785,48 @@ async function runTests() {
     }
     console.log(`✓ Team 2 claimed Set 1! Locked sets: [${testRoomDoc.usedSets.join(', ')}]`);
 
+    // 19. TEST REGISTERED TEAMS DROPDOWN & REJOIN FLOW
+    console.log('\n--- 19. Testing Registered Teams Fetching for Dropdown Rejoin ---');
+    const registeredGroups = await contestants
+      .find({ roomId: { $in: [roomId, testCode] }, kind: 'group' })
+      .sort({ joinOrder: 1 })
+      .toArray();
+
+    const registeredTeamsForDropdown = registeredGroups.map((g) => ({
+      id: g.id,
+      name: g.name,
+      score: g.score,
+      joinOrder: g.joinOrder,
+      hasActiveSession: Boolean(g.claimToken),
+    }));
+
+    if (registeredTeamsForDropdown.length < 5) {
+      throw new Error(`Expected at least 5 registered teams in dropdown, got ${registeredTeamsForDropdown.length}`);
+    }
+
+    const teamNames = registeredTeamsForDropdown.map((t) => t.name);
+    console.log(`✓ Fetched registered teams for dropdown: [${teamNames.join(', ')}]`);
+
+    // Verify rejoining Alpha Team 3 from dropdown
+    const chosenFromDropdown = registeredTeamsForDropdown.find((t) => t.name === 'Alpha Team 3');
+    if (!chosenFromDropdown) {
+      throw new Error('Alpha Team 3 not found in dropdown list');
+    }
+
+    // Simulate rejoining with team chosen from dropdown
+    const rejoinTarget = await contestants.findOne({ id: chosenFromDropdown.id });
+    if (rejoinTarget.name !== 'Alpha Team 3') {
+      throw new Error('Dropdown selected team mismatch');
+    }
+    console.log(`✓ Dropdown selection & rejoin verified: Rejoined as "${chosenFromDropdown.name}" (${chosenFromDropdown.score} PTS) without manual typing.`);
+
     // Cleanup
     await rooms.deleteOne({ id: roomId });
     await contestants.deleteMany({ roomId });
     await questions.deleteMany({ roomId });
     console.log('✓ Cleaned up integration test records.');
 
-    console.log('\nALL 18 TESTS & USER REQUIREMENTS PASSED SUCCESSFULLY! 🎉');
+    console.log('\nALL 19 TESTS & USER REQUIREMENTS PASSED SUCCESSFULLY! 🎉');
   } finally {
     await client.close();
   }

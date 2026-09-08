@@ -153,47 +153,42 @@ export async function joinRoom(
     });
 
     if (existingGroup) {
-      // Check device session locking
-      if (existingGroup.claimToken) {
-        // If client sends matching token, allow reconnect seamlessly
-        if (clientClaimToken && clientClaimToken === existingGroup.claimToken) {
-          await contestants.updateOne(
-            { id: existingGroup.id },
-            { $set: { lastActiveAt: new Date() } }
-          );
-          return {
-            success: true,
-            roomId: room.id,
-            contestantId: existingGroup.id,
-            groupName: existingGroup.name,
-            joinOrder: existingGroup.joinOrder,
-            claimToken: existingGroup.claimToken,
-            reconnected: true,
-          };
-        }
+      const isStale =
+        !existingGroup.lastActiveAt ||
+        Date.now() - new Date(existingGroup.lastActiveAt).getTime() > 5 * 60 * 1000;
+      const canReclaim =
+        !existingGroup.claimToken ||
+        (clientClaimToken && clientClaimToken === existingGroup.claimToken) ||
+        isStale ||
+        room.status === 'lobby' ||
+        room.status === 'finished';
 
-        // Another device is already holding this team session!
+      if (canReclaim) {
+        const newClaimToken =
+          existingGroup.claimToken && clientClaimToken === existingGroup.claimToken
+            ? existingGroup.claimToken
+            : crypto.randomUUID();
+
+        await contestants.updateOne(
+          { id: existingGroup.id },
+          { $set: { claimToken: newClaimToken, lastActiveAt: new Date() } }
+        );
+
         return {
-          success: false,
-          error: `Team "${existingGroup.name}" is already active on another device. Please log out from that device to switch.`,
+          success: true,
+          roomId: room.id,
+          contestantId: existingGroup.id,
+          groupName: existingGroup.name,
+          joinOrder: existingGroup.joinOrder,
+          claimToken: newClaimToken,
+          reconnected: true,
         };
       }
 
-      // If team exists but has no active claim token (e.g. host added or previously logged out), claim it
-      const newClaimToken = crypto.randomUUID();
-      await contestants.updateOne(
-        { id: existingGroup.id },
-        { $set: { claimToken: newClaimToken, lastActiveAt: new Date() } }
-      );
-
+      // Another device is actively using this team right now!
       return {
-        success: true,
-        roomId: room.id,
-        contestantId: existingGroup.id,
-        groupName: existingGroup.name,
-        joinOrder: existingGroup.joinOrder,
-        claimToken: newClaimToken,
-        reconnected: true,
+        success: false,
+        error: `Team "${existingGroup.name}" is currently active on another device. Please log out from that device or wait a moment to rejoin.`,
       };
     }
 
@@ -299,10 +294,19 @@ export async function checkRoomCapacity(codeOrId: string) {
     const contestants = await getContestantsCollection();
     const groups = await contestants
       .find({ roomId: { $in: [room.id, room.code] }, kind: 'group' })
+      .sort({ joinOrder: 1 })
       .toArray();
 
     const maxGroups = room.maxTeams || null;
     const isFull = maxGroups !== null ? groups.length >= maxGroups : false;
+
+    const registeredTeams = groups.map((g) => ({
+      id: g.id,
+      name: g.name,
+      score: g.score,
+      joinOrder: g.joinOrder,
+      hasActiveSession: Boolean(g.claimToken),
+    }));
 
     return {
       exists: true,
@@ -313,10 +317,16 @@ export async function checkRoomCapacity(codeOrId: string) {
       groupCount: groups.length,
       maxGroups,
       isFull,
+      registeredTeams,
     };
   } catch {
     return { exists: false };
   }
+}
+
+export async function getRoomRegisteredTeams(codeOrId: string) {
+  const res = await checkRoomCapacity(codeOrId);
+  return res && res.exists ? res.registeredTeams || [] : [];
 }
 
 export async function getAdminRooms(): Promise<Room[]> {
