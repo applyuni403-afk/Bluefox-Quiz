@@ -782,6 +782,11 @@ export async function markCorrect(
     return { success: false, error: 'No active contestant to award points' };
   }
 
+  // RAPID FIRE GUARD: In rapid fire mode, host marking correct submits the answer for the active team and advances set
+  if (room.roundType === 'rapid_fire') {
+    return submitAnswer(canonicalId, recipientId, question.correctAnswer);
+  }
+
   const contestant = await contestants.findOne({ id: recipientId });
   if (!contestant) {
     return { success: false, error: 'Contestant not found' };
@@ -836,6 +841,14 @@ export async function markWrong(roomId: string) {
   if (!room) return;
   const canonicalId = room.id;
 
+  // RAPID FIRE GUARD: In rapid fire mode, wrong answer skips to next question in active set (NO passing to other teams)
+  if (room.roundType === 'rapid_fire') {
+    if (room.activeContestantId) {
+      await skipRapidFireQuestion(canonicalId, room.activeContestantId);
+    }
+    return;
+  }
+
   const rooms = await getRoomsCollection();
   await rooms.updateOne(
     { id: canonicalId },
@@ -850,6 +863,15 @@ export async function passQuestion(roomId: string) {
   const room = await resolveRoom(roomId);
   if (!room || !room.currentQuestionId) return;
   const canonicalId = room.id;
+
+  // RAPID FIRE GUARD: In rapid fire mode, questions NEVER pass to other teams!
+  // It immediately skips to the next question within the active team's set
+  if (room.roundType === 'rapid_fire') {
+    if (room.activeContestantId) {
+      await skipRapidFireQuestion(canonicalId, room.activeContestantId);
+    }
+    return { closed: false, rapidFireAdvanced: true };
+  }
 
   const contestants = await getContestantsCollection();
   const groups = await contestants
@@ -921,6 +943,31 @@ export async function nextTurn(roomId: string) {
     .toArray();
 
   if (groups.length === 0) return;
+
+  if (room.roundType === 'rapid_fire') {
+    const nextGroup = await getNextRapidFireContestantId(
+      canonicalId,
+      room.code,
+      room.activeContestantId,
+      room.setAssignments
+    );
+    const rooms = await getRoomsCollection();
+    await rooms.updateOne(
+      { id: canonicalId },
+      {
+        $set: {
+          activeContestantId: nextGroup,
+          passCount: 0,
+          lastResult: null,
+          currentQuestionId: null,
+          timerEndsAt: null,
+          rapidFireState: null,
+        },
+        $inc: { version: 1 },
+      }
+    );
+    return;
+  }
 
   const currentIndex = groups.findIndex((g) => g.id === room.activeContestantId);
   const nextIndex = currentIndex === -1 ? 0 : (currentIndex + 1) % groups.length;
@@ -1088,6 +1135,38 @@ function isAnswerCorrect(userAns: string, correctAns: string, qtype: string): bo
   return false;
 }
 
+// Helper to determine the next team eligible to choose a Rapid Fire set
+export async function getNextRapidFireContestantId(
+  canonicalId: string,
+  roomCode?: string | null,
+  currentContestantId?: string | null,
+  setAssignments?: Record<string, string>
+): Promise<string | null> {
+  const contestants = await getContestantsCollection();
+  const roomIds = [canonicalId, roomCode].filter(Boolean) as string[];
+  const groups = await contestants
+    .find({ roomId: { $in: roomIds }, kind: 'group' })
+    .sort({ joinOrder: 1 })
+    .toArray();
+
+  if (groups.length === 0) return null;
+  if (groups.length === 1) return groups[0].id;
+
+  const currentIdx = groups.findIndex((g) => g.id === currentContestantId);
+  const playedTeamIds = new Set(Object.values(setAssignments || {}));
+
+  // Find the next group in joinOrder that has not played a Rapid Fire set yet
+  for (let offset = 1; offset <= groups.length; offset++) {
+    const candidate = groups[(currentIdx + offset) % groups.length];
+    if (!playedTeamIds.has(candidate.id)) {
+      return candidate.id;
+    }
+  }
+
+  // If all groups have played, default to the next in rotation
+  return groups[(currentIdx + 1) % groups.length].id;
+}
+
 export async function submitAnswer(
   roomId: string,
   contestantId: string,
@@ -1169,12 +1248,23 @@ export async function submitAnswer(
       { $set: { status: 'done', answeredBy: isCorrect ? contestant.id : null } }
     );
 
+    const rfFilter: Record<string, unknown> = {
+      roomId: { $in: roomIds },
+      roundType: 'rapid_fire',
+      setName: room.rapidFireState.activeSet,
+    };
+    if (room.currentRoundName) {
+      const inRound = await questions.countDocuments({
+        ...rfFilter,
+        roundName: room.currentRoundName,
+      });
+      if (inRound > 0) {
+        rfFilter.roundName = room.currentRoundName;
+      }
+    }
+
     const setQuestions = await questions
-      .find({
-        roomId: { $in: roomIds },
-        roundType: 'rapid_fire',
-        setName: room.rapidFireState.activeSet,
-      })
+      .find(rfFilter)
       .sort({ number: 1 })
       .toArray();
 
@@ -1206,6 +1296,14 @@ export async function submitAnswer(
         contestantName: contestant.name,
       };
     } else {
+      // Set complete: determine next eligible team in rotation
+      const nextTeamId = await getNextRapidFireContestantId(
+        canonicalId,
+        room.code,
+        contestant.id,
+        room.setAssignments
+      );
+
       await rooms.updateOne(
         { id: canonicalId },
         {
@@ -1213,6 +1311,7 @@ export async function submitAnswer(
             currentQuestionId: null,
             timerEndsAt: null,
             lastResult: 'correct',
+            activeContestantId: nextTeamId,
             'rapidFireState.status': 'completed',
             'rapidFireState.correctCount': newCorrectCount,
             'rapidFireState.scoreEarned': newScoreEarned,
@@ -1364,18 +1463,42 @@ export async function selectRapidFireSet(
   const canonicalId = room.id;
   const roomIds = [canonicalId, room.code].filter(Boolean) as string[];
 
+  // Resolve group ID if contestant is an individual
+  const contestants = await getContestantsCollection();
+  const contestant = await contestants.findOne({ id: contestantId });
+  const effectiveGroupId =
+    contestant?.kind === 'individual' && contestant.parentGroupId
+      ? contestant.parentGroupId
+      : contestantId;
+
   // Check if set is already taken
   if (room.usedSets && room.usedSets.includes(cleanSetName)) {
     throw new Error(`Set "${cleanSetName}" has already been chosen by another team.`);
   }
 
+  // Check if this team has already played a set in this round
+  if (room.setAssignments && Object.values(room.setAssignments).includes(effectiveGroupId)) {
+    throw new Error(`Your team has already completed a Rapid Fire set in this round.`);
+  }
+
   const questions = await getQuestionsCollection();
+  const rfFilter: Record<string, unknown> = {
+    roomId: { $in: roomIds },
+    roundType: 'rapid_fire',
+    setName: cleanSetName,
+  };
+  if (room.currentRoundName) {
+    const inRound = await questions.countDocuments({
+      ...rfFilter,
+      roundName: room.currentRoundName,
+    });
+    if (inRound > 0) {
+      rfFilter.roundName = room.currentRoundName;
+    }
+  }
+
   const setQuestions = await questions
-    .find({
-      roomId: { $in: roomIds },
-      roundType: 'rapid_fire',
-      setName: cleanSetName,
-    })
+    .find(rfFilter)
     .sort({ number: 1 })
     .toArray();
 
@@ -1391,7 +1514,7 @@ export async function selectRapidFireSet(
 
   const rapidFireState = {
     activeSet: cleanSetName,
-    contestantId,
+    contestantId: effectiveGroupId,
     questionIndex: 0,
     totalQuestions: setQuestions.length,
     correctCount: 0,
@@ -1405,13 +1528,13 @@ export async function selectRapidFireSet(
     {
       $set: {
         roundType: 'rapid_fire',
-        activeContestantId: contestantId,
+        activeContestantId: effectiveGroupId,
         currentQuestionId: setQuestions[0].id,
         timerEndsAt,
         rapidFireState,
         lastResult: null,
         revealedAnswer: null,
-        [`setAssignments.${cleanSetName}`]: contestantId,
+        [`setAssignments.${cleanSetName}`]: effectiveGroupId,
       },
       $addToSet: { usedSets: cleanSetName },
       $inc: { version: 1 },
@@ -1435,12 +1558,23 @@ export async function skipRapidFireQuestion(roomId: string, contestantId: string
     );
   }
 
+  const rfFilter: Record<string, unknown> = {
+    roomId: { $in: roomIds },
+    roundType: 'rapid_fire',
+    setName: room.rapidFireState.activeSet,
+  };
+  if (room.currentRoundName) {
+    const inRound = await questions.countDocuments({
+      ...rfFilter,
+      roundName: room.currentRoundName,
+    });
+    if (inRound > 0) {
+      rfFilter.roundName = room.currentRoundName;
+    }
+  }
+
   const setQuestions = await questions
-    .find({
-      roomId: { $in: roomIds },
-      roundType: 'rapid_fire',
-      setName: room.rapidFireState.activeSet,
-    })
+    .find(rfFilter)
     .sort({ number: 1 })
     .toArray();
 
@@ -1463,7 +1597,14 @@ export async function skipRapidFireQuestion(roomId: string, contestantId: string
       }
     );
   } else {
-    // Set complete
+    // Set complete: determine next eligible team in rotation
+    const nextTeamId = await getNextRapidFireContestantId(
+      canonicalId,
+      room.code,
+      contestantId,
+      room.setAssignments
+    );
+
     await rooms.updateOne(
       { id: canonicalId },
       {
@@ -1471,6 +1612,7 @@ export async function skipRapidFireQuestion(roomId: string, contestantId: string
           currentQuestionId: null,
           timerEndsAt: null,
           lastResult: 'wrong',
+          activeContestantId: nextTeamId,
           'rapidFireState.status': 'completed',
         },
         $inc: { version: 1 },
@@ -1484,6 +1626,13 @@ export async function finishRapidFireSet(roomId: string) {
   if (!room) return;
   const canonicalId = room.id;
 
+  const nextTeamId = await getNextRapidFireContestantId(
+    canonicalId,
+    room.code,
+    room.activeContestantId,
+    room.setAssignments
+  );
+
   const rooms = await getRoomsCollection();
   await rooms.updateOne(
     { id: canonicalId },
@@ -1491,6 +1640,7 @@ export async function finishRapidFireSet(roomId: string) {
       $set: {
         currentQuestionId: null,
         timerEndsAt: null,
+        activeContestantId: nextTeamId,
         'rapidFireState.status': 'completed',
       },
       $inc: { version: 1 },
@@ -1540,6 +1690,7 @@ export async function startRapidFireForGroup(
         timerEndsAt: null,
         lastResult: null,
         passCount: 0,
+        rapidFireState: null,
       },
       $inc: { version: 1 },
     }

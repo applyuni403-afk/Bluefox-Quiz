@@ -3,7 +3,7 @@ import {
   getContestantsCollection,
   getQuestionsCollection,
 } from '@/lib/db';
-import { resolveRoom } from '@/lib/actions';
+import { resolveRoom, finishRapidFireSet } from '@/lib/actions';
 
 export async function GET(
   _request: Request,
@@ -11,10 +11,24 @@ export async function GET(
 ) {
   try {
     const { roomId } = await params;
-    const room = await resolveRoom(roomId);
+    let room = await resolveRoom(roomId);
 
     if (!room) {
       return NextResponse.json({ error: 'Room not found' }, { status: 404 });
+    }
+
+    // Auto-complete Rapid Fire set if the continuous timeline has expired
+    if (
+      room.roundType === 'rapid_fire' &&
+      room.rapidFireState?.status === 'running' &&
+      room.timerEndsAt &&
+      new Date() > new Date(room.timerEndsAt)
+    ) {
+      await finishRapidFireSet(room.id);
+      room = await resolveRoom(roomId);
+      if (!room) {
+        return NextResponse.json({ error: 'Room not found' }, { status: 404 });
+      }
     }
 
     const roomIds = [room.id, room.code].filter(Boolean) as string[];
@@ -92,6 +106,10 @@ export async function GET(
         usedByTeamName: assignedTeam || null,
       };
     });
+
+    rapidFireSets.sort((a, b) =>
+      a.setName.localeCompare(b.setName, undefined, { numeric: true, sensitivity: 'base' })
+    );
 
     const board =
       room.roundType === 'rapid_fire'

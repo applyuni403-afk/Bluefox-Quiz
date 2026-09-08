@@ -912,6 +912,29 @@ export default function PlayRoomPage({
                       )}
                     </div>
                   )}
+
+                  {/* Non-turn Spectator View during live Rapid Fire */}
+                  {!isMyTurn && isTimerRunning && (
+                    <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-200/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-amber-900 shadow-2xs">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-xl bg-amber-100 flex items-center justify-center text-amber-600 shrink-0">
+                          <Flame className="w-4 h-4 animate-pulse" />
+                        </div>
+                        <div>
+                          <p className="font-bold text-slate-800">
+                            <strong>{activeContestant?.name || 'Active Team'}</strong> is playing{' '}
+                            {room.rapidFireState.activeSet}
+                          </p>
+                          <p className="text-[11px] text-amber-700 font-medium">
+                            Rapid Fire questions are answered exclusively by the active team (no passing). Please get ready for your turn!
+                          </p>
+                        </div>
+                      </div>
+                      <span className="px-3 py-1 rounded-full bg-amber-100 text-amber-800 font-bold text-[10px] uppercase tracking-wider shrink-0">
+                        Spectator Mode
+                      </span>
+                    </div>
+                  )}
                 </div>
               ) : room.rapidFireState?.status === 'completed' ? (
                 /* Rapid Fire Set Summary */
@@ -927,6 +950,13 @@ export default function PlayRoomPage({
                       Score: <strong className="text-slate-900">{room.rapidFireState.correctCount}</strong> / {room.rapidFireState.totalQuestions} questions correct (+{room.rapidFireState.scoreEarned} PTS)
                     </p>
                   </div>
+
+                  {isMyTurn && (
+                    <div className="p-3 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-2xl font-bold text-xs shadow-md animate-pulse">
+                      ★ It&apos;s Your Turn, {myContestant?.name}! Choose your Rapid Fire set below.
+                    </div>
+                  )}
+
                   <RapidFireSetSelector
                     sets={rapidFireSets || []}
                     isInteractive={isMyTurn}
@@ -937,13 +967,20 @@ export default function PlayRoomPage({
                 </div>
               ) : (
                 /* No Set Active -> Rapid Fire Set Selector */
-                <RapidFireSetSelector
-                  sets={rapidFireSets || []}
-                  isInteractive={isMyTurn}
-                  activeTeamName={activeContestant?.name}
-                  defaultTimelineSeconds={room.rapidFireSeconds || 60}
-                  onSelectSet={handleSelectRapidFireSet}
-                />
+                <div className="space-y-3">
+                  {isMyTurn && (
+                    <div className="p-3 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-2xl font-bold text-xs shadow-md animate-pulse">
+                      ★ It&apos;s Your Turn, {myContestant?.name}! Choose your Rapid Fire set below.
+                    </div>
+                  )}
+                  <RapidFireSetSelector
+                    sets={rapidFireSets || []}
+                    isInteractive={isMyTurn}
+                    activeTeamName={activeContestant?.name}
+                    defaultTimelineSeconds={room.rapidFireSeconds || 60}
+                    onSelectSet={handleSelectRapidFireSet}
+                  />
+                </div>
               )}
             </div>
           )}

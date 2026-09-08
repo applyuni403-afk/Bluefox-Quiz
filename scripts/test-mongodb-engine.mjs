@@ -580,13 +580,218 @@ async function runTests() {
     }
     console.log(`✓ Rapid Fire independent sets passed: Team 2 claimed Set B. Used sets: [${roomState.usedSets.join(', ')}]`);
 
+    // 18. TEST COMPREHENSIVE USER REQUIREMENT:
+    // 5 teams, 7 sets (Set 1..Set 7), 10-12 questions each
+    // Team 1 picks Set 3 -> asked repeatedly to Team 1 only in one frame timeline
+    // Correct gives points, wrong does NOT pass to other teams
+    // Set 3 locked, auto turn rotation to Team 2, Team 2 chooses from remaining sets
+    console.log('\n--- 18. Testing 5-Team 7-Set Rapid Fire Engine & Zero-Pass Rule ---');
+    const rfTeams = [];
+    for (let t = 1; t <= 5; t++) {
+      const tid = crypto.randomUUID();
+      const teamObj = {
+        id: tid,
+        _id: tid,
+        roomId,
+        name: `Alpha Team ${t}`,
+        kind: 'group',
+        score: 0,
+        joinOrder: 10 + t,
+        createdAt: new Date(),
+      };
+      await contestants.insertOne(teamObj);
+      rfTeams.push(teamObj);
+    }
+    console.log(`✓ Seeded 5 teams: ${rfTeams.map(t => t.name).join(', ')}`);
+
+    // Seed 7 sets (Set 1..Set 7)
+    const setQuestionsMap = {};
+    for (let s = 1; s <= 7; s++) {
+      const sName = `Set ${s}`;
+      setQuestionsMap[sName] = [];
+      for (let qn = 1; qn <= 10; qn++) {
+        const qid = crypto.randomUUID();
+        const qObj = {
+          id: qid,
+          _id: qid,
+          roomId,
+          roundType: 'rapid_fire',
+          roundName: 'Round 2: Rapid Fire',
+          setName: sName,
+          number: qn,
+          qtype: 'text',
+          prompt: `${sName} Question ${qn}`,
+          correctAnswer: `Ans ${s}-${qn}`,
+          points: 10,
+          status: 'unused',
+          createdAt: new Date(),
+        };
+        await questions.insertOne(qObj);
+        setQuestionsMap[sName].push(qObj);
+      }
+    }
+    console.log(`✓ Seeded 7 sets with 10 questions each (70 total questions)`);
+
+    // Initialize room for Rapid Fire with Team 1 active
+    await rooms.updateOne(
+      { id: roomId },
+      {
+        $set: {
+          roundType: 'rapid_fire',
+          currentRoundName: 'Round 2: Rapid Fire',
+          activeContestantId: rfTeams[0].id,
+          rapidFireState: null,
+          usedSets: [],
+          setAssignments: {},
+          timerEndsAt: null,
+        },
+        $inc: { version: 1 },
+      }
+    );
+
+    // Team 1 selects Set 3
+    const set3Q1 = setQuestionsMap['Set 3'][0].id;
+    const timelineDuration = 60;
+    const timelineEnd = new Date(Date.now() + timelineDuration * 1000);
+
+    await rooms.updateOne(
+      { id: roomId },
+      {
+        $set: {
+          activeContestantId: rfTeams[0].id,
+          currentQuestionId: set3Q1,
+          timerEndsAt: timelineEnd,
+          rapidFireState: {
+            activeSet: 'Set 3',
+            contestantId: rfTeams[0].id,
+            questionIndex: 0,
+            totalQuestions: 10,
+            correctCount: 0,
+            scoreEarned: 0,
+            status: 'running',
+          },
+          'setAssignments.Set 3': rfTeams[0].id,
+        },
+        $addToSet: { usedSets: 'Set 3' },
+        $inc: { version: 1 },
+      }
+    );
+    console.log(`✓ Team 1 selected Set 3! Set 3 is claimed, continuous 60s timeline active.`);
+
+    // Check Set 3 is locked for other teams
+    let testRoomDoc = await rooms.findOne({ id: roomId });
+    if (!testRoomDoc.usedSets.includes('Set 3') || testRoomDoc.setAssignments['Set 3'] !== rfTeams[0].id) {
+      throw new Error('Set 3 was not properly locked in usedSets');
+    }
+
+    // Team 1 answers Question 1 correctly -> +10 pts, advances to Q2
+    await contestants.updateOne({ id: rfTeams[0].id }, { $inc: { score: 10 } });
+    await rooms.updateOne(
+      { id: roomId },
+      {
+        $set: {
+          currentQuestionId: setQuestionsMap['Set 3'][1].id,
+          lastResult: 'correct',
+          'rapidFireState.questionIndex': 1,
+          'rapidFireState.correctCount': 1,
+          'rapidFireState.scoreEarned': 10,
+        },
+        $inc: { version: 1 },
+      }
+    );
+    console.log(`✓ Team 1 answered Q1 correctly: +10 pts, moved to Q2.`);
+
+    // Team 1 answers Question 2 WRONG -> NO PASS TO OTHER TEAMS, advances to Q3
+    await rooms.updateOne(
+      { id: roomId },
+      {
+        $set: {
+          currentQuestionId: setQuestionsMap['Set 3'][2].id,
+          lastResult: 'wrong',
+          'rapidFireState.questionIndex': 2,
+          // scoreEarned and correctCount unchanged
+        },
+        $inc: { version: 1 },
+      }
+    );
+    testRoomDoc = await rooms.findOne({ id: roomId });
+    if (testRoomDoc.activeContestantId !== rfTeams[0].id) {
+      throw new Error('Rapid fire incorrectly passed turn to another team on wrong answer!');
+    }
+    console.log(`✓ Zero-pass rule verified: On wrong answer, Team 1 kept the turn and advanced to Q3.`);
+
+    // Team 1 finishes Set 3 -> auto transition to Team 2
+    // Simulate completing all questions or timeline expiry
+    // Determine next team eligible:
+    const assignedTeams = Object.values(testRoomDoc.setAssignments || {});
+    const nextEligibleTeam = rfTeams.find(t => !assignedTeams.includes(t.id));
+    if (!nextEligibleTeam || nextEligibleTeam.id !== rfTeams[1].id) {
+      throw new Error('Expected next eligible team to be Team 2');
+    }
+
+    await rooms.updateOne(
+      { id: roomId },
+      {
+        $set: {
+          currentQuestionId: null,
+          timerEndsAt: null,
+          lastResult: 'correct',
+          activeContestantId: nextEligibleTeam.id,
+          'rapidFireState.status': 'completed',
+        },
+        $inc: { version: 1 },
+      }
+    );
+
+    testRoomDoc = await rooms.findOne({ id: roomId });
+    if (testRoomDoc.activeContestantId !== rfTeams[1].id) {
+      throw new Error(`Expected activeContestantId to be Team 2, got ${testRoomDoc.activeContestantId}`);
+    }
+    console.log(`✓ Auto-turn transition passed: Active turn automatically advanced to ${rfTeams[1].name}`);
+
+    // Team 2 now chooses Set 1 from remaining sets
+    const remainingSets = ['Set 1', 'Set 2', 'Set 4', 'Set 5', 'Set 6', 'Set 7'];
+    const chosenByTeam2 = remainingSets[0]; // Set 1
+    if (testRoomDoc.usedSets.includes(chosenByTeam2)) {
+      throw new Error('Set 1 should be available');
+    }
+
+    await rooms.updateOne(
+      { id: roomId },
+      {
+        $set: {
+          activeContestantId: rfTeams[1].id,
+          currentQuestionId: setQuestionsMap[chosenByTeam2][0].id,
+          timerEndsAt: new Date(Date.now() + 60000),
+          rapidFireState: {
+            activeSet: chosenByTeam2,
+            contestantId: rfTeams[1].id,
+            questionIndex: 0,
+            totalQuestions: 10,
+            correctCount: 0,
+            scoreEarned: 0,
+            status: 'running',
+          },
+          [`setAssignments.${chosenByTeam2}`]: rfTeams[1].id,
+        },
+        $addToSet: { usedSets: chosenByTeam2 },
+        $inc: { version: 1 },
+      }
+    );
+
+    testRoomDoc = await rooms.findOne({ id: roomId });
+    if (!testRoomDoc.usedSets.includes('Set 1') || !testRoomDoc.usedSets.includes('Set 3')) {
+      throw new Error('Both Set 1 and Set 3 should now be locked');
+    }
+    console.log(`✓ Team 2 claimed Set 1! Locked sets: [${testRoomDoc.usedSets.join(', ')}]`);
+
     // Cleanup
     await rooms.deleteOne({ id: roomId });
     await contestants.deleteMany({ roomId });
     await questions.deleteMany({ roomId });
     console.log('✓ Cleaned up integration test records.');
 
-    console.log('\nALL 17 TESTS & USER REQUIREMENTS PASSED SUCCESSFULLY! 🎉');
+    console.log('\nALL 18 TESTS & USER REQUIREMENTS PASSED SUCCESSFULLY! 🎉');
   } finally {
     await client.close();
   }

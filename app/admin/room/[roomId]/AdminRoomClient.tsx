@@ -496,7 +496,7 @@ export function AdminRoomClient({ roomId }: AdminRoomClientProps) {
                   </select>
                 </div>
 
-                <div className="w-full sm:w-auto self-end">
+                <div className="w-full sm:w-auto self-end flex gap-2">
                   <button
                     type="button"
                     disabled={!selectedParentGroupId || isActionPending}
@@ -510,10 +510,24 @@ export function AdminRoomClient({ roomId }: AdminRoomClientProps) {
                         );
                       })
                     }
-                    className="w-full sm:w-auto py-2 px-4 rounded-xl text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white transition disabled:opacity-40 shadow-xs cursor-pointer flex items-center justify-center gap-1.5"
+                    className="flex-1 sm:flex-initial py-2 px-3.5 rounded-xl text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white transition disabled:opacity-40 shadow-xs cursor-pointer flex items-center justify-center gap-1.5"
                   >
                     <Flame className="w-3.5 h-3.5" />
                     <span>Activate Team</span>
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isActionPending}
+                    onClick={() =>
+                      wrapAction(async () => {
+                        await nextTurn(room.id);
+                        toast.info('Turn Advanced', 'Rotated to next team.');
+                      })
+                    }
+                    className="py-2 px-3 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 transition cursor-pointer flex items-center justify-center gap-1"
+                    title="Advance to next team in rotation"
+                  >
+                    <span>Next Team &rarr;</span>
                   </button>
                 </div>
               </div>
@@ -533,30 +547,30 @@ export function AdminRoomClient({ roomId }: AdminRoomClientProps) {
                   onClick={() => wrapAction(() => closeQuestion(room.id))}
                   className="text-xs font-semibold text-slate-500 hover:text-slate-900 cursor-pointer"
                 >
-                  Close Question
+                  Close Display &times;
                 </button>
               )}
             </div>
 
             {activeHostQuestion ? (
-              <div className="space-y-4">
-                <QuestionCard question={activeHostQuestion} />
+              <div className="space-y-3">
+                <QuestionCard question={activeHostQuestion} showAnswer={false} />
 
-                {/* Host Answer Hint Bar */}
-                <div className="p-3.5 rounded-2xl bg-indigo-50 border border-indigo-200 flex flex-wrap items-center justify-between gap-3 text-xs">
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-indigo-900">Answer Key:</span>
-                    <span className="font-mono font-black text-indigo-900 text-sm bg-white px-3 py-1 rounded-xl border border-indigo-200 shadow-2xs">
+                {/* Host Answer Display */}
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1.5 text-xs">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-slate-500 font-semibold">Official Answer:</span>
+                    <span className="font-bold text-emerald-700 font-mono bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
                       {activeHostQuestion.correctAnswer}
                     </span>
                   </div>
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-slate-500 font-semibold">Active Turn:</span>
-                    <span className="font-bold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-xl border border-blue-200">
+                    <span className="font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
                       {activeContestant?.name || 'No team selected'}
                       {room.passCount > 0 ? ` (Pass #${room.passCount})` : ''}
                     </span>
-                    <span className="font-black text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-xl border border-emerald-200">
+                    <span className="font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
                       +{activeHostQuestion.points} PTS
                     </span>
                   </div>
@@ -564,129 +578,144 @@ export function AdminRoomClient({ roomId }: AdminRoomClientProps) {
 
                 {/* Evaluation Action Buttons */}
                 <div className="space-y-2.5 pt-2">
-                  <div className="grid grid-cols-2 sm:grid-cols-6 gap-2">
-                    <button
-                      type="button"
-                      disabled={isActionPending || !activeContestant}
-                      onClick={() =>
-                        wrapAction(async () => {
-                          const res = await markCorrect(room.id);
-                          if (res?.success) {
-                            toast.success(
-                              'Points Awarded!',
-                              `+${res.pointsAwarded} PTS auto-added to "${
-                                res.contestantName || activeContestant?.name
-                              }".`
-                            );
-                          }
-                        })
-                      }
-                      className="py-2.5 px-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 font-bold text-xs uppercase tracking-wider text-white shadow-md shadow-emerald-500/20 transition active:scale-95 flex items-center justify-center gap-1 disabled:opacity-50 cursor-pointer"
-                    >
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      <span className="truncate">Correct (+{activeHostQuestion.points})</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      disabled={isActionPending}
-                      onClick={() => wrapAction(() => markWrong(room.id))}
-                      className="py-2.5 px-2 rounded-xl bg-rose-600 hover:bg-rose-700 font-bold text-xs uppercase tracking-wider text-white shadow-md shadow-rose-500/20 transition active:scale-95 flex items-center justify-center gap-1 disabled:opacity-50 cursor-pointer"
-                    >
-                      <XCircle className="w-3.5 h-3.5" />
-                      <span>Wrong</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      disabled={isActionPending}
-                      onClick={() => wrapAction(() => passQuestion(room.id))}
-                      className="py-2.5 px-2 rounded-xl bg-blue-600 hover:bg-blue-700 font-bold text-xs uppercase tracking-wider text-white shadow-md shadow-blue-500/20 transition active:scale-95 flex items-center justify-center gap-1 disabled:opacity-50 cursor-pointer"
-                    >
-                      <SkipForward className="w-3.5 h-3.5" />
-                      <span>Pass Turn</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      disabled={isActionPending}
-                      onClick={() => wrapAction(() => revealQuestionAnswer(room.id))}
-                      className="py-2.5 px-2 rounded-xl bg-amber-500 hover:bg-amber-600 font-bold text-xs uppercase tracking-wider text-white shadow-md shadow-amber-500/20 transition active:scale-95 flex items-center justify-center gap-1 disabled:opacity-50 cursor-pointer"
-                    >
-                      <Eye className="w-3.5 h-3.5" />
-                      <span>Reveal</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      disabled={isActionPending}
-                      onClick={() => wrapAction(() => proceedToNextNumber(room.id))}
-                      className="py-2.5 px-2 rounded-xl bg-slate-800 hover:bg-slate-900 font-bold text-xs uppercase tracking-wider text-white shadow-md shadow-slate-900/20 transition active:scale-95 flex items-center justify-center gap-1 disabled:opacity-50 cursor-pointer"
-                    >
-                      <span>Next Q</span>
-                      <ChevronRight className="w-3.5 h-3.5" />
-                    </button>
-
-                    <button
-                      type="button"
-                      disabled={isActionPending}
-                      onClick={() => wrapAction(() => closeQuestion(room.id))}
-                      className="py-2.5 px-2 rounded-xl bg-slate-100 hover:bg-slate-200 font-bold text-xs uppercase tracking-wider text-slate-700 border border-slate-200 transition active:scale-95 flex items-center justify-center disabled:opacity-50 cursor-pointer"
-                    >
-                      <span>Done</span>
-                    </button>
-                  </div>
-
-                  {/* Rapid Fire Live Host Action Bar */}
-                  {room.roundType === 'rapid_fire' && room.rapidFireState?.status === 'running' && (
-                    <div className="p-3 bg-amber-50 rounded-xl border border-amber-300 flex flex-wrap items-center justify-between gap-2 text-xs">
-                      <div className="flex items-center gap-2">
-                        <Flame className="w-4 h-4 text-amber-600" />
-                        <span className="font-bold text-amber-950">
-                          Rapid Fire Live: Set {room.rapidFireState.activeSet} (Q{room.rapidFireState.questionIndex + 1}/{room.rapidFireState.totalQuestions})
-                        </span>
+                  {room.roundType === 'rapid_fire' ? (
+                    room.rapidFireState?.status === 'running' ? (
+                      /* Rapid Fire Live Host Action Bar */
+                      <div className="p-3 bg-amber-50 rounded-2xl border-2 border-amber-300 flex flex-wrap items-center justify-between gap-3 text-xs shadow-xs">
+                        <div className="flex items-center gap-2">
+                          <Flame className="w-5 h-5 text-amber-600 animate-pulse" />
+                          <div>
+                            <span className="text-[10px] font-black uppercase tracking-wider text-amber-800 block">
+                              Rapid Fire Live Controls
+                            </span>
+                            <span className="font-bold text-amber-950">
+                              Set {room.rapidFireState.activeSet} (Q{room.rapidFireState.questionIndex + 1}/{room.rapidFireState.totalQuestions}) &bull; {activeContestant?.name}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            disabled={isActionPending}
+                            onClick={() =>
+                              wrapAction(async () => {
+                                const res = await submitAnswer(room.id, activeContestant?.id || '', activeHostQuestion?.correctAnswer || '');
+                                if (res?.correct) toast.success('Correct!', 'Advanced to next question.');
+                              })
+                            }
+                            className="px-3.5 py-2 rounded-xl bg-emerald-600 text-white font-bold text-xs hover:bg-emerald-700 shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95"
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            <span>+Pts & Next</span>
+                          </button>
+                          <button
+                            type="button"
+                            disabled={isActionPending}
+                            onClick={() =>
+                              wrapAction(async () => {
+                                await skipRapidFireQuestion(room.id, activeContestant?.id || '');
+                                toast.info('Skipped', 'Advanced to next question.');
+                              })
+                            }
+                            className="px-3 py-2 rounded-xl bg-slate-700 text-white font-bold text-xs hover:bg-slate-800 shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95"
+                          >
+                            <SkipForward className="w-3.5 h-3.5" />
+                            <span>Skip & Next</span>
+                          </button>
+                          <button
+                            type="button"
+                            disabled={isActionPending}
+                            onClick={() =>
+                              wrapAction(async () => {
+                                await finishRapidFireSet(room.id);
+                                toast.info('Stopped', 'Rapid fire set finished.');
+                              })
+                            }
+                            className="px-3 py-2 rounded-xl bg-rose-600 text-white font-bold text-xs hover:bg-rose-700 shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95"
+                          >
+                            <XCircle className="w-3.5 h-3.5" />
+                            <span>Stop Set</span>
+                          </button>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          disabled={isActionPending}
-                          onClick={() =>
-                            wrapAction(async () => {
-                              const res = await submitAnswer(room.id, activeContestant?.id || '', activeHostQuestion?.correctAnswer || '');
-                              if (res?.correct) toast.success('Correct!', 'Advanced to next question.');
-                            })
-                          }
-                          className="px-2.5 py-1 rounded-lg bg-emerald-600 text-white font-bold text-xs hover:bg-emerald-700"
-                        >
-                          +Pts & Next
-                        </button>
-                        <button
-                          type="button"
-                          disabled={isActionPending}
-                          onClick={() =>
-                            wrapAction(async () => {
-                              await skipRapidFireQuestion(room.id, activeContestant?.id || '');
-                              toast.info('Skipped', 'Advanced to next question.');
-                            })
-                          }
-                          className="px-2.5 py-1 rounded-lg bg-slate-600 text-white font-bold text-xs hover:bg-slate-700"
-                        >
-                          Skip & Next
-                        </button>
-                        <button
-                          type="button"
-                          disabled={isActionPending}
-                          onClick={() =>
-                            wrapAction(async () => {
-                              await finishRapidFireSet(room.id);
-                              toast.info('Stopped', 'Rapid fire set finished.');
-                            })
-                          }
-                          className="px-2.5 py-1 rounded-lg bg-rose-600 text-white font-bold text-xs hover:bg-rose-700"
-                        >
-                          Stop Set
-                        </button>
+                    ) : (
+                      <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-xl text-xs text-amber-900 flex items-center justify-between">
+                        <span>Rapid Fire mode: Activate a team above or let the active team select their set below.</span>
                       </div>
+                    )
+                  ) : (
+                    /* Normal Evaluation Action Buttons */
+                    <div className="grid grid-cols-2 sm:grid-cols-6 gap-2">
+                      <button
+                        type="button"
+                        disabled={isActionPending || !activeContestant}
+                        onClick={() =>
+                          wrapAction(async () => {
+                            const res = await markCorrect(room.id);
+                            if (res?.success) {
+                              toast.success(
+                                'Points Awarded!',
+                                `+${res.pointsAwarded} PTS auto-added to "${
+                                  res.contestantName || activeContestant?.name
+                                }".`
+                              );
+                            }
+                          })
+                        }
+                        className="py-2.5 px-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 font-bold text-xs uppercase tracking-wider text-white shadow-md shadow-emerald-500/20 transition active:scale-95 flex items-center justify-center gap-1 disabled:opacity-50 cursor-pointer"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span className="truncate">Correct (+{activeHostQuestion.points})</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={isActionPending}
+                        onClick={() => wrapAction(() => markWrong(room.id))}
+                        className="py-2.5 px-2 rounded-xl bg-rose-600 hover:bg-rose-700 font-bold text-xs uppercase tracking-wider text-white shadow-md shadow-rose-500/20 transition active:scale-95 flex items-center justify-center gap-1 disabled:opacity-50 cursor-pointer"
+                      >
+                        <XCircle className="w-3.5 h-3.5" />
+                        <span>Wrong</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={isActionPending}
+                        onClick={() => wrapAction(() => passQuestion(room.id))}
+                        className="py-2.5 px-2 rounded-xl bg-blue-600 hover:bg-blue-700 font-bold text-xs uppercase tracking-wider text-white shadow-md shadow-blue-500/20 transition active:scale-95 flex items-center justify-center gap-1 disabled:opacity-50 cursor-pointer"
+                      >
+                        <SkipForward className="w-3.5 h-3.5" />
+                        <span>Pass Turn</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={isActionPending}
+                        onClick={() => wrapAction(() => revealQuestionAnswer(room.id))}
+                        className="py-2.5 px-2 rounded-xl bg-amber-500 hover:bg-amber-600 font-bold text-xs uppercase tracking-wider text-white shadow-md shadow-amber-500/20 transition active:scale-95 flex items-center justify-center gap-1 disabled:opacity-50 cursor-pointer"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                        <span>Reveal</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={isActionPending}
+                        onClick={() => wrapAction(() => proceedToNextNumber(room.id))}
+                        className="py-2.5 px-2 rounded-xl bg-slate-800 hover:bg-slate-900 font-bold text-xs uppercase tracking-wider text-white shadow-md shadow-slate-900/20 transition active:scale-95 flex items-center justify-center gap-1 disabled:opacity-50 cursor-pointer"
+                      >
+                        <span>Next Q</span>
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={isActionPending}
+                        onClick={() => wrapAction(() => closeQuestion(room.id))}
+                        className="py-2.5 px-2 rounded-xl bg-slate-100 hover:bg-slate-200 font-bold text-xs uppercase tracking-wider text-slate-700 border border-slate-200 transition active:scale-95 flex items-center justify-center disabled:opacity-50 cursor-pointer"
+                      >
+                        <span>Done</span>
+                      </button>
                     </div>
                   )}
 

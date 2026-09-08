@@ -95,11 +95,13 @@ export function QuestionsClient({ roomId }: QuestionsClientProps) {
 
   // Extract all distinct rapid fire sets
   const configuredSets = useMemo(() => {
-    const list = new Set<string>(['Set A', 'Set B', 'Set C']);
+    const list = new Set<string>(['Set 1', 'Set 2', 'Set 3', 'Set 4', 'Set 5', 'Set 6', 'Set 7', 'Set A', 'Set B', 'Set C']);
     questions.forEach((q) => {
       if (q.setName && q.setName.trim()) list.add(q.setName.trim());
     });
-    return Array.from(list);
+    return Array.from(list).sort((a, b) =>
+      a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })
+    );
   }, [questions]);
 
   const filteredQuestions = useMemo(() => {
@@ -643,7 +645,7 @@ export function QuestionsClient({ roomId }: QuestionsClientProps) {
                       {s}
                     </button>
                   ))}
-                  {['Set A', 'Set B', 'Set C', 'Set D'].map((s) => {
+                  {['Set 1', 'Set 2', 'Set 3', 'Set 4', 'Set 5', 'Set 6', 'Set 7', 'Set 8'].map((s) => {
                     if (configuredSets.includes(s)) return null;
                     return (
                       <button
