@@ -157,7 +157,7 @@ export function AdminRoomClient({ roomId }: AdminRoomClientProps) {
     setIsActionPending(true);
     try {
       await fn();
-      await mutate();
+      mutate();
     } catch (err) {
       toast.error('Action Failed', (err as Error).message || 'Operation could not be completed');
     } finally {

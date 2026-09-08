@@ -53,7 +53,7 @@ export function useGameState(roomId: string | undefined | null) {
     fetcher,
     {
       refreshInterval: 1000, // Real-time sync via 1-second polling
-      dedupingInterval: 500,
+      dedupingInterval: 100, // Low deduping interval so manual action mutations revalidate immediately
       revalidateOnFocus: true,
     }
   );

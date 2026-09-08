@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import {
   getContestantsCollection,
   getQuestionsCollection,
+  getCachedRoomState,
+  setCachedRoomState,
 } from '@/lib/db';
 import { resolveRoom, finishRapidFireSet } from '@/lib/actions';
 
@@ -11,6 +13,26 @@ export async function GET(
 ) {
   try {
     const { roomId } = await params;
+
+    // 1. Check in-memory short-term cache (instant < 1ms response for polling clients)
+    const cached = getCachedRoomState<any>(roomId);
+    if (cached) {
+      // If rapid-fire timer expired while in cache, bypass cache to finish set
+      const isExpiredRf =
+        cached.room?.roundType === 'rapid_fire' &&
+        cached.room?.rapidFireState?.status === 'running' &&
+        cached.room?.timerEndsAt &&
+        new Date() > new Date(cached.room.timerEndsAt);
+
+      if (!isExpiredRf) {
+        return NextResponse.json(cached, {
+          headers: {
+            'Cache-Control': 'no-store, no-cache, must-revalidate',
+          },
+        });
+      }
+    }
+
     let room = await resolveRoom(roomId);
 
     if (!room) {
@@ -33,59 +55,56 @@ export async function GET(
 
     const roomIds = [room.id, room.code].filter(Boolean) as string[];
 
-    const contestants = await getContestantsCollection();
-    const cs = await contestants
-      .find({ roomId: { $in: roomIds } })
-      .sort({ joinOrder: 1 })
-      .toArray();
+    // 2. Fetch contestants and ALL room questions in parallel (just 1 round-trip)
+    const [contestantsColl, questionsColl] = await Promise.all([
+      getContestantsCollection(),
+      getQuestionsCollection(),
+    ]);
 
-    const questions = await getQuestionsCollection();
+    const [cs, allQuestions] = await Promise.all([
+      contestantsColl
+        .find({ roomId: { $in: roomIds } })
+        .sort({ joinOrder: 1 })
+        .toArray(),
+      questionsColl
+        .find({ roomId: { $in: roomIds } })
+        .toArray(),
+    ]);
+
+    // 3. In-memory resolution of current question
     const q = room.currentQuestionId
-      ? await questions.findOne({ id: room.currentQuestionId })
+      ? allQuestions.find((item) => item.id === room.currentQuestionId) || null
       : null;
 
-    // Normal round board tiles (for active round)
+    // 4. Normal round board tiles (computed in memory)
     const effectiveRoundName =
       room.currentRoundName ||
       (room.customRounds && room.customRounds.length > 0 ? room.customRounds[0] : null);
 
-    const normalFilter: Record<string, unknown> = {
-      roomId: { $in: roomIds },
-      roundType: 'normal',
-    };
+    let normalQuestions = allQuestions.filter((item) => item.roundType === 'normal');
     if (effectiveRoundName) {
-      const countInRound = await questions.countDocuments({
-        ...normalFilter,
-        roundName: effectiveRoundName,
-      });
+      const countInRound = normalQuestions.filter((item) => item.roundName === effectiveRoundName).length;
       if (countInRound > 0) {
-        normalFilter.roundName = effectiveRoundName;
+        normalQuestions = normalQuestions.filter((item) => item.roundName === effectiveRoundName);
       }
     }
-    const normalBoard = await questions
-      .find(normalFilter, {
-        projection: { id: 1, number: 1, status: 1, roundName: 1, points: 1 },
-      })
-      .sort({ number: 1 })
-      .toArray();
+    normalQuestions.sort((a, b) => a.number - b.number);
+    const normalBoard = normalQuestions.map((item) => ({
+      id: item.id,
+      number: item.number,
+      status: item.status,
+      roundName: item.roundName,
+      points: item.points,
+    }));
 
-    // Rapid Fire Sets
-    const rfFilter: Record<string, unknown> = {
-      roomId: { $in: roomIds },
-      roundType: 'rapid_fire',
-    };
+    // 5. Rapid Fire Sets (computed in memory)
+    let rfQuestions = allQuestions.filter((item) => item.roundType === 'rapid_fire');
     if (effectiveRoundName) {
-      const countRfInRound = await questions.countDocuments({
-        ...rfFilter,
-        roundName: effectiveRoundName,
-      });
+      const countRfInRound = rfQuestions.filter((item) => item.roundName === effectiveRoundName).length;
       if (countRfInRound > 0) {
-        rfFilter.roundName = effectiveRoundName;
+        rfQuestions = rfQuestions.filter((item) => item.roundName === effectiveRoundName);
       }
     }
-    const rfQuestions = await questions
-      .find(rfFilter, { projection: { id: 1, setName: 1, number: 1, status: 1, roundName: 1 } })
-      .toArray();
 
     const setMap = new Map<string, { count: number }>();
     for (const item of rfQuestions) {
@@ -111,19 +130,23 @@ export async function GET(
       a.setName.localeCompare(b.setName, undefined, { numeric: true, sensitivity: 'base' })
     );
 
+    // 6. Active Rapid Fire Board (computed in memory)
+    const activeRfSet = room.rapidFireState?.activeSet;
     const board =
       room.roundType === 'rapid_fire'
-        ? await questions
-            .find(
-              {
-                roomId: { $in: roomIds },
-                roundType: 'rapid_fire',
-                ...(room.rapidFireState?.activeSet ? { setName: room.rapidFireState.activeSet } : {}),
-              },
-              { projection: { id: 1, number: 1, status: 1, setName: 1 } }
+        ? allQuestions
+            .filter(
+              (item) =>
+                item.roundType === 'rapid_fire' &&
+                (!activeRfSet || item.setName === activeRfSet)
             )
-            .sort({ number: 1 })
-            .toArray()
+            .sort((a, b) => a.number - b.number)
+            .map((item) => ({
+              id: item.id,
+              number: item.number,
+              status: item.status,
+              setName: item.setName,
+            }))
         : [];
 
     // Allow correctAnswer only when revealedAnswer exists or question is done
@@ -148,21 +171,26 @@ export async function GET(
         }
       : null;
 
-    return NextResponse.json(
-      {
-        room,
-        contestants: cs,
-        question: safeQ,
-        board,
-        normalBoard,
-        rapidFireSets,
+    const responsePayload = {
+      room,
+      contestants: cs,
+      question: safeQ,
+      board,
+      normalBoard,
+      rapidFireSets,
+    };
+
+    // Cache with short TTL (500ms) for high-frequency polling efficiency
+    setCachedRoomState(room.id, responsePayload, 500);
+    if (room.code) {
+      setCachedRoomState(room.code, responsePayload, 500);
+    }
+
+    return NextResponse.json(responsePayload, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate',
       },
-      {
-        headers: {
-          'Cache-Control': 'no-store, no-cache, must-revalidate',
-        },
-      }
-    );
+    });
   } catch (error) {
     console.error('State API Error:', error);
     return NextResponse.json(
