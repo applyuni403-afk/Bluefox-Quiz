@@ -917,11 +917,17 @@ export function AdminRoomClient({ roomId }: AdminRoomClientProps) {
                           <span className="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase bg-slate-200 text-slate-700">
                             {q.qtype}
                           </span>
-                          {q.roundName && (
-                            <span className="px-1.5 py-0.2 rounded text-[8px] font-bold uppercase bg-indigo-50 text-indigo-700 border border-indigo-200 truncate max-w-[120px]">
-                              {q.roundName}
+                          <span className="px-1.5 py-0.2 rounded text-[8px] font-bold uppercase bg-indigo-50 text-indigo-700 border border-indigo-200 truncate max-w-[140px]">
+                            {q.roundName || 'Round 1'}
+                          </span>
+                          {q.setName && (
+                            <span className="px-1.5 py-0.2 rounded text-[8px] font-bold uppercase bg-amber-50 text-amber-800 border border-amber-200">
+                              {q.setName}
                             </span>
                           )}
+                          <span className="px-1.5 py-0.2 rounded text-[8px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                            #{q.number}
+                          </span>
                           <span className="text-[10px] font-black text-blue-600">
                             {q.points}p
                           </span>

@@ -92,8 +92,8 @@ export async function createRoom(name: string): Promise<Room> {
     code,
     status: 'lobby',
     roundType: 'normal',
-    currentRoundName: null,
-    customRounds: [],
+    currentRoundName: 'Round 1: General Knowledge',
+    customRounds: ['Round 1: General Knowledge', 'Round 2: Rapid Fire'],
     currentQuestionId: null,
     activeContestantId: null,
     timerEndsAt: null,
@@ -1698,8 +1698,21 @@ export async function createQuestion(data: CreateQuestionInput): Promise<Questio
   const roomIds = [canonicalRoomId, room?.code].filter(Boolean) as string[];
 
   const questions = await getQuestionsCollection();
-  const cleanRoundName = data.roundName?.trim() || null;
+  const cleanRoundName =
+    data.roundName?.trim() ||
+    room?.currentRoundName ||
+    (data.roundType === 'rapid_fire' ? 'Round 2: Rapid Fire' : 'Round 1: General Knowledge');
   const cleanSetName = data.setName?.trim() || null;
+
+  // Ensure room has this round recorded
+  const roomsColl = await getRoomsCollection();
+  await roomsColl.updateOne(
+    { id: canonicalRoomId },
+    {
+      $addToSet: { customRounds: cleanRoundName },
+      ...(!room?.currentRoundName ? { $set: { currentRoundName: cleanRoundName } } : {}),
+    }
+  );
 
   let qNumber = data.number;
   if (!qNumber) {

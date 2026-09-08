@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -59,7 +59,7 @@ export function QuestionsClient({ roomId }: QuestionsClientProps) {
 
   // Form states
   const [roundType, setRoundType] = useState<'normal' | 'rapid_fire'>('normal');
-  const [roundName, setRoundName] = useState('');
+  const [roundName, setRoundName] = useState('Round 1: General Knowledge');
   const [setName, setSetName] = useState('Set A');
   const [questionNumber, setQuestionNumber] = useState<number | undefined>(undefined);
   const [showRoundManager, setShowRoundManager] = useState(false);
@@ -71,6 +71,12 @@ export function QuestionsClient({ roomId }: QuestionsClientProps) {
   const [points, setPoints] = useState(10);
   const [timerSeconds, setTimerSeconds] = useState<number | undefined>(undefined);
   const [rapidFireNumber, setRapidFireNumber] = useState<number | undefined>(undefined);
+
+  useEffect(() => {
+    if (room?.currentRoundName && (!roundName || roundName === 'Round 1: General Knowledge')) {
+      setRoundName(room.currentRoundName);
+    }
+  }, [room?.currentRoundName]);
 
   // MCQ options
   const [mcqOptions, setMcqOptions] = useState<string[]>(['', '', '', '']);
@@ -233,12 +239,19 @@ export function QuestionsClient({ roomId }: QuestionsClientProps) {
       }
     }
 
+    const cleanRound = roundName.trim() || room?.currentRoundName || 'Round 1: General Knowledge';
+    if (!cleanRound) {
+      setError('Round Name is required. Every question must belong to a round.');
+      toast.warning('Round Name Required', 'Every question must belong to a round.');
+      return;
+    }
+
     setSubmitting(true);
     try {
       await createQuestion({
         roomId,
         roundType,
-        roundName: roundName.trim() || undefined,
+        roundName: cleanRound,
         setName: roundType === 'rapid_fire' ? (setName.trim() || 'Set A') : undefined,
         qtype,
         prompt,
@@ -385,17 +398,22 @@ export function QuestionsClient({ roomId }: QuestionsClientProps) {
                 <div className="flex items-center gap-1.5">
                   <Tag className="w-3.5 h-3.5 text-blue-600" />
                   <label className="text-[11px] font-black uppercase tracking-wider text-slate-700">
-                    Round Setup &amp; Name
+                    Round Name <span className="text-rose-600">*</span>
                   </label>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setShowRoundManager(!showRoundManager)}
-                  className="text-[10px] font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 cursor-pointer"
-                >
-                  <Settings2 className="w-3 h-3" />
-                  <span>{showRoundManager ? 'Close Setup' : 'Manage Rounds'}</span>
-                </button>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-blue-700 font-semibold">
+                    Each round has its own set of questions
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setShowRoundManager(!showRoundManager)}
+                    className="text-[10px] font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 cursor-pointer"
+                  >
+                    <Settings2 className="w-3 h-3" />
+                    <span>{showRoundManager ? 'Close Setup' : 'Manage Rounds'}</span>
+                  </button>
+                </div>
               </div>
 
               {/* Round Manager Drawer */}
@@ -460,6 +478,7 @@ export function QuestionsClient({ roomId }: QuestionsClientProps) {
                 <div className="flex gap-1.5 items-center">
                   <input
                     type="text"
+                    required
                     list="rounds-datalist"
                     value={roundName}
                     onChange={(e) => {
@@ -925,14 +944,17 @@ export function QuestionsClient({ roomId }: QuestionsClientProps) {
                       <span className="px-1.5 py-0.2 rounded text-[8px] font-black uppercase bg-slate-100 text-slate-700 border border-slate-200">
                         {q.qtype}
                       </span>
+                      <span className="px-1.5 py-0.2 rounded text-[8px] font-black uppercase bg-indigo-50 text-indigo-700 border border-indigo-200 truncate max-w-[160px]">
+                        {q.roundName || 'Round 1'}
+                      </span>
                       {q.roundType === 'rapid_fire' ? (
                         <span className="px-1.5 py-0.2 rounded text-[8px] font-black uppercase bg-amber-50 text-amber-800 border border-amber-200 flex items-center gap-1">
                           <Flame className="w-2.5 h-2.5 text-amber-600" />
                           <span>{q.setName || 'Rapid Fire'} &bull; #{q.number ?? 1}</span>
                         </span>
                       ) : (
-                        <span className="px-1.5 py-0.2 rounded text-[8px] font-black uppercase bg-indigo-50 text-indigo-700 border border-indigo-200 truncate max-w-[200px]">
-                          {q.roundName ? `${q.roundName} • ` : ''}#{q.number ?? 1}
+                        <span className="px-1.5 py-0.2 rounded text-[8px] font-black uppercase bg-blue-50 text-blue-700 border border-blue-200">
+                          #{q.number ?? 1}
                         </span>
                       )}
                       <span className="text-[10px] font-black text-indigo-600">

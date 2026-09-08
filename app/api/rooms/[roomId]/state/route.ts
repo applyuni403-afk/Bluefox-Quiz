@@ -31,12 +31,22 @@ export async function GET(
       : null;
 
     // Normal round board tiles (for active round)
+    const effectiveRoundName =
+      room.currentRoundName ||
+      (room.customRounds && room.customRounds.length > 0 ? room.customRounds[0] : null);
+
     const normalFilter: Record<string, unknown> = {
       roomId: { $in: roomIds },
       roundType: 'normal',
     };
-    if (room.currentRoundName) {
-      normalFilter.roundName = room.currentRoundName;
+    if (effectiveRoundName) {
+      const countInRound = await questions.countDocuments({
+        ...normalFilter,
+        roundName: effectiveRoundName,
+      });
+      if (countInRound > 0) {
+        normalFilter.roundName = effectiveRoundName;
+      }
     }
     const normalBoard = await questions
       .find(normalFilter, {
@@ -46,11 +56,21 @@ export async function GET(
       .toArray();
 
     // Rapid Fire Sets
+    const rfFilter: Record<string, unknown> = {
+      roomId: { $in: roomIds },
+      roundType: 'rapid_fire',
+    };
+    if (effectiveRoundName) {
+      const countRfInRound = await questions.countDocuments({
+        ...rfFilter,
+        roundName: effectiveRoundName,
+      });
+      if (countRfInRound > 0) {
+        rfFilter.roundName = effectiveRoundName;
+      }
+    }
     const rfQuestions = await questions
-      .find(
-        { roomId: { $in: roomIds }, roundType: 'rapid_fire' },
-        { projection: { id: 1, setName: 1, number: 1, status: 1 } }
-      )
+      .find(rfFilter, { projection: { id: 1, setName: 1, number: 1, status: 1, roundName: 1 } })
       .toArray();
 
     const setMap = new Map<string, { count: number }>();
