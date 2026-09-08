@@ -6,6 +6,10 @@ import {
   setCachedRoomState,
 } from '@/lib/db';
 import { resolveRoom, finishRapidFireSet } from '@/lib/actions';
+import {
+  getMemoryRoomState,
+  broadcastRoomState,
+} from '@/lib/engine/roomEngine';
 
 export async function GET(
   _request: Request,
@@ -14,18 +18,17 @@ export async function GET(
   try {
     const { roomId } = await params;
 
-    // 1. Check in-memory short-term cache (instant < 1ms response for polling clients)
-    const cached = getCachedRoomState<any>(roomId);
-    if (cached) {
-      // If rapid-fire timer expired while in cache, bypass cache to finish set
+    // 1. Check in-memory room engine first (< 0.1 ms response)
+    const memoryState = getMemoryRoomState(roomId) || getCachedRoomState<any>(roomId);
+    if (memoryState) {
       const isExpiredRf =
-        cached.room?.roundType === 'rapid_fire' &&
-        cached.room?.rapidFireState?.status === 'running' &&
-        cached.room?.timerEndsAt &&
-        new Date() > new Date(cached.room.timerEndsAt);
+        memoryState.room?.roundType === 'rapid_fire' &&
+        memoryState.room?.rapidFireState?.status === 'running' &&
+        memoryState.room?.timerEndsAt &&
+        new Date() > new Date(memoryState.room.timerEndsAt);
 
       if (!isExpiredRf) {
-        return NextResponse.json(cached, {
+        return NextResponse.json(memoryState, {
           headers: {
             'Cache-Control': 'no-store, no-cache, must-revalidate',
           },
@@ -153,6 +156,7 @@ export async function GET(
     const shouldReveal = Boolean(room.revealedAnswer || (q && q.status === 'done'));
     const safeQ = q
       ? {
+          _id: q._id || q.id,
           id: q.id,
           roomId: q.roomId,
           roundType: q.roundType,
@@ -185,6 +189,7 @@ export async function GET(
     if (room.code) {
       setCachedRoomState(room.code, responsePayload, 500);
     }
+    broadcastRoomState(room.id, room.code, responsePayload);
 
     return NextResponse.json(responsePayload, {
       headers: {

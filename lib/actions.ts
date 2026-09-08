@@ -10,6 +10,14 @@ import {
   Question,
 } from '@/lib/db';
 import { assertAdmin, loginAdmin, logoutAdmin, checkIsAdmin } from '@/lib/session';
+import { loadAndCacheRoomState } from '@/lib/engine/roomEngine';
+
+function notifyRoomChanged(canonicalId: string, code?: string | null) {
+  invalidateRoomState(canonicalId, code);
+  loadAndCacheRoomState(canonicalId).catch((err) => {
+    console.error('Room engine broadcast error:', err);
+  });
+}
 
 export async function authenticateAdmin(pin: string): Promise<boolean> {
   return loginAdmin(pin);
@@ -615,7 +623,7 @@ export async function startGame(roomId: string) {
       $inc: { version: 1 },
     }
   );
-  invalidateRoomState(canonicalId, room.code);
+  notifyRoomChanged(canonicalId, room.code);
 }
 
 export async function finishGame(roomId: string) {
@@ -635,7 +643,7 @@ export async function finishGame(roomId: string) {
       $inc: { version: 1 },
     }
   );
-  invalidateRoomState(canonicalId, room.code);
+  notifyRoomChanged(canonicalId, room.code);
 }
 
 export async function resetGame(roomId: string) {
@@ -674,7 +682,7 @@ export async function resetGame(roomId: string) {
     contestants.updateMany({ roomId: { $in: roomIds } }, { $set: { score: 0 } }),
     questions.updateMany({ roomId: { $in: roomIds } }, { $set: { status: 'unused', answeredBy: null } }),
   ]);
-  invalidateRoomState(canonicalId, room.code);
+  notifyRoomChanged(canonicalId, room.code);
 }
 
 // -------------------------------------------------------------
@@ -708,7 +716,7 @@ export async function showQuestion(roomId: string, questionId: string) {
       }
     ),
   ]);
-  invalidateRoomState(canonicalId, room.code);
+  notifyRoomChanged(canonicalId, room.code);
 }
 
 export async function startTimer(roomId: string, customSeconds?: number) {
@@ -740,7 +748,7 @@ export async function startTimer(roomId: string, customSeconds?: number) {
       $inc: { version: 1 },
     }
   );
-  invalidateRoomState(canonicalId, room.code);
+  notifyRoomChanged(canonicalId, room.code);
 }
 
 export async function stopTimer(roomId: string) {
@@ -757,7 +765,7 @@ export async function stopTimer(roomId: string) {
       $inc: { version: 1 },
     }
   );
-  invalidateRoomState(canonicalId, room.code);
+  notifyRoomChanged(canonicalId, room.code);
 }
 
 export async function setRoomTimerDefault(roomId: string, seconds: number) {
@@ -774,7 +782,7 @@ export async function setRoomTimerDefault(roomId: string, seconds: number) {
       $inc: { version: 1 },
     }
   );
-  invalidateRoomState(canonicalId, room.code);
+  notifyRoomChanged(canonicalId, room.code);
 }
 
 export async function markCorrect(
@@ -854,7 +862,7 @@ export async function markCorrect(
   }
 
   await Promise.all(updatePromises);
-  invalidateRoomState(canonicalId, room.code);
+  notifyRoomChanged(canonicalId, room.code);
 
   return {
     success: true,
@@ -886,7 +894,7 @@ export async function markWrong(roomId: string) {
       $inc: { version: 1 },
     }
   );
-  invalidateRoomState(canonicalId, room.code);
+  notifyRoomChanged(canonicalId, room.code);
 }
 
 export async function passQuestion(roomId: string) {
@@ -935,7 +943,7 @@ export async function passQuestion(roomId: string) {
         }
       ),
     ]);
-    invalidateRoomState(canonicalId, room.code);
+    notifyRoomChanged(canonicalId, room.code);
     return { closed: true, revealedAnswer: q?.correctAnswer || null };
   }
 
@@ -960,7 +968,7 @@ export async function passQuestion(roomId: string) {
       $inc: { version: 1 },
     }
   );
-  invalidateRoomState(canonicalId, room.code);
+  notifyRoomChanged(canonicalId, room.code);
 
   return { nextContestantId: nextGroup.id, passCount: room.passCount + 1 };
 }
@@ -1001,7 +1009,7 @@ export async function nextTurn(roomId: string) {
         $inc: { version: 1 },
       }
     );
-    invalidateRoomState(canonicalId, room.code);
+    notifyRoomChanged(canonicalId, room.code);
     return;
   }
 
@@ -1021,7 +1029,7 @@ export async function nextTurn(roomId: string) {
       $inc: { version: 1 },
     }
   );
-  invalidateRoomState(canonicalId, room.code);
+  notifyRoomChanged(canonicalId, room.code);
 }
 
 export async function closeQuestion(roomId: string) {
@@ -1055,7 +1063,7 @@ export async function closeQuestion(roomId: string) {
     ),
   ]);
 
-  invalidateRoomState(canonicalId, room.code);
+  notifyRoomChanged(canonicalId, room.code);
 }
 
 export async function revealQuestionAnswer(roomId: string) {
@@ -1147,7 +1155,7 @@ export async function chooseNormalQuestion(
     ),
   ]);
 
-  invalidateRoomState(canonicalId, room.code);
+  notifyRoomChanged(canonicalId, room.code);
 }
 
 function normalizeAnswer(text: string): string {
@@ -1336,7 +1344,7 @@ export async function submitAnswer(
         }
       );
 
-      invalidateRoomState(canonicalId, room.code);
+      notifyRoomChanged(canonicalId, room.code);
 
       return {
         success: true,
@@ -1369,7 +1377,7 @@ export async function submitAnswer(
         }
       );
 
-      invalidateRoomState(canonicalId, room.code);
+      notifyRoomChanged(canonicalId, room.code);
 
       return {
         success: true,
@@ -1450,7 +1458,7 @@ export async function submitAnswer(
       }
     );
 
-    invalidateRoomState(canonicalId, room.code);
+    notifyRoomChanged(canonicalId, room.code);
 
     return {
       success: true,
@@ -1497,7 +1505,7 @@ export async function adjustScore(contestantId: string, delta: number) {
   if (room) {
     const rooms = await getRoomsCollection();
     await rooms.updateOne({ id: room.id }, { $inc: { version: 1 } });
-    invalidateRoomState(room.id, room.code);
+    notifyRoomChanged(room.id, room.code);
   }
 }
 
@@ -1595,7 +1603,7 @@ export async function selectRapidFireSet(
     }
   );
 
-  invalidateRoomState(canonicalId, room.code);
+  notifyRoomChanged(canonicalId, room.code);
 
   return { success: true, rapidFireState };
 }
@@ -1676,7 +1684,7 @@ export async function skipRapidFireQuestion(roomId: string, contestantId: string
     );
   }
 
-  invalidateRoomState(canonicalId, room.code);
+  notifyRoomChanged(canonicalId, room.code);
 }
 
 export async function finishRapidFireSet(roomId: string) {
@@ -1705,7 +1713,7 @@ export async function finishRapidFireSet(roomId: string) {
     }
   );
 
-  invalidateRoomState(canonicalId, room.code);
+  notifyRoomChanged(canonicalId, room.code);
 }
 
 export async function setRapidFireTimeLimit(roomId: string, seconds: number) {
@@ -1722,7 +1730,7 @@ export async function setRapidFireTimeLimit(roomId: string, seconds: number) {
     }
   );
 
-  invalidateRoomState(room.id, room.code);
+  notifyRoomChanged(room.id, room.code);
 }
 
 export async function startRapidFireForGroup(
