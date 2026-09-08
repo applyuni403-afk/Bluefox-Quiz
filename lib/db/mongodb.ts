@@ -20,13 +20,6 @@ function getUri(): string {
   return uri;
 }
 
-const clientOptions = {
-  maxPoolSize: 30,
-  minPoolSize: 5,
-  maxIdleTimeMS: 60000,
-  serverSelectionTimeoutMS: 5000,
-};
-
 let clientPromise: Promise<MongoClient>;
 
 export function getMongoClientPromise(): Promise<MongoClient> {
@@ -34,13 +27,13 @@ export function getMongoClientPromise(): Promise<MongoClient> {
 
   if (process.env.NODE_ENV === 'development') {
     if (!global._mongoClientPromise) {
-      const client = new MongoClient(uri, clientOptions);
+      const client = new MongoClient(uri);
       global._mongoClientPromise = client.connect();
     }
     return global._mongoClientPromise;
   } else {
     if (!clientPromise) {
-      const client = new MongoClient(uri, clientOptions);
+      const client = new MongoClient(uri);
       clientPromise = client.connect();
     }
     return clientPromise;
@@ -56,17 +49,11 @@ let indexesCreated = false;
 async function ensureIndexes(db: Db) {
   if (indexesCreated) return;
   try {
-    await Promise.all([
-      db.collection('rooms').createIndex({ code: 1 }, { unique: true }),
-      db.collection('rooms').createIndex({ id: 1 }, { unique: true, sparse: true }),
-      db.collection('contestants').createIndex({ id: 1 }, { unique: true, sparse: true }),
-      db.collection('contestants').createIndex({ roomId: 1 }),
-      db.collection('contestants').createIndex({ roomId: 1, kind: 1 }),
-      db.collection('questions').createIndex({ id: 1 }, { unique: true, sparse: true }),
-      db.collection('questions').createIndex({ roomId: 1 }),
-      db.collection('questions').createIndex({ roomId: 1, number: 1 }),
-      db.collection('questions').createIndex({ roomId: 1, roundType: 1 }),
-    ]);
+    await db.collection('rooms').createIndex({ code: 1 }, { unique: true });
+    await db.collection('contestants').createIndex({ roomId: 1 });
+    await db.collection('contestants').createIndex({ roomId: 1, kind: 1 });
+    await db.collection('questions').createIndex({ roomId: 1 });
+    await db.collection('questions').createIndex({ roomId: 1, number: 1 });
     indexesCreated = true;
   } catch {
     // Indexes might already exist or be initializing

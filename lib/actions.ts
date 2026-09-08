@@ -4,20 +4,11 @@ import {
   getRoomsCollection,
   getContestantsCollection,
   getQuestionsCollection,
-  invalidateRoomState,
   Room,
   Contestant,
   Question,
 } from '@/lib/db';
 import { assertAdmin, loginAdmin, logoutAdmin, checkIsAdmin } from '@/lib/session';
-import { loadAndCacheRoomState } from '@/lib/engine/roomEngine';
-
-function notifyRoomChanged(canonicalId: string, code?: string | null) {
-  invalidateRoomState(canonicalId, code);
-  loadAndCacheRoomState(canonicalId).catch((err) => {
-    console.error('Room engine broadcast error:', err);
-  });
-}
 
 export async function authenticateAdmin(pin: string): Promise<boolean> {
   return loginAdmin(pin);
@@ -623,7 +614,6 @@ export async function startGame(roomId: string) {
       $inc: { version: 1 },
     }
   );
-  notifyRoomChanged(canonicalId, room.code);
 }
 
 export async function finishGame(roomId: string) {
@@ -643,7 +633,6 @@ export async function finishGame(roomId: string) {
       $inc: { version: 1 },
     }
   );
-  notifyRoomChanged(canonicalId, room.code);
 }
 
 export async function resetGame(roomId: string) {
@@ -653,36 +642,32 @@ export async function resetGame(roomId: string) {
   const canonicalId = room.id;
   const roomIds = [canonicalId, room.code];
 
-  const [rooms, contestants, questions] = await Promise.all([
-    getRoomsCollection(),
-    getContestantsCollection(),
-    getQuestionsCollection(),
-  ]);
+  const rooms = await getRoomsCollection();
+  await rooms.updateOne(
+    { id: canonicalId },
+    {
+      $set: {
+        status: 'lobby',
+        currentQuestionId: null,
+        activeContestantId: null,
+        timerEndsAt: null,
+        passCount: 0,
+        lastResult: null,
+        revealedAnswer: null,
+        rapidFireState: null,
+        usedSets: [],
+        setAssignments: {},
+        roundType: 'normal',
+      },
+      $inc: { version: 1 },
+    }
+  );
 
-  await Promise.all([
-    rooms.updateOne(
-      { id: canonicalId },
-      {
-        $set: {
-          status: 'lobby',
-          currentQuestionId: null,
-          activeContestantId: null,
-          timerEndsAt: null,
-          passCount: 0,
-          lastResult: null,
-          revealedAnswer: null,
-          rapidFireState: null,
-          usedSets: [],
-          setAssignments: {},
-          roundType: 'normal',
-        },
-        $inc: { version: 1 },
-      }
-    ),
-    contestants.updateMany({ roomId: { $in: roomIds } }, { $set: { score: 0 } }),
-    questions.updateMany({ roomId: { $in: roomIds } }, { $set: { status: 'unused', answeredBy: null } }),
-  ]);
-  notifyRoomChanged(canonicalId, room.code);
+  const contestants = await getContestantsCollection();
+  await contestants.updateMany({ roomId: { $in: roomIds } }, { $set: { score: 0 } });
+
+  const questions = await getQuestionsCollection();
+  await questions.updateMany({ roomId: { $in: roomIds } }, { $set: { status: 'unused', answeredBy: null } });
 }
 
 // -------------------------------------------------------------
@@ -695,28 +680,23 @@ export async function showQuestion(roomId: string, questionId: string) {
   if (!room) return;
   const canonicalId = room.id;
 
-  const [questions, rooms] = await Promise.all([
-    getQuestionsCollection(),
-    getRoomsCollection(),
-  ]);
+  const questions = await getQuestionsCollection();
+  await questions.updateOne({ id: questionId }, { $set: { status: 'active' } });
 
-  await Promise.all([
-    questions.updateOne({ id: questionId }, { $set: { status: 'active' } }),
-    rooms.updateOne(
-      { id: canonicalId },
-      {
-        $set: {
-          currentQuestionId: questionId,
-          passCount: 0,
-          lastResult: null,
-          revealedAnswer: null,
-          timerEndsAt: null,
-        },
-        $inc: { version: 1 },
-      }
-    ),
-  ]);
-  notifyRoomChanged(canonicalId, room.code);
+  const rooms = await getRoomsCollection();
+  await rooms.updateOne(
+    { id: canonicalId },
+    {
+      $set: {
+        currentQuestionId: questionId,
+        passCount: 0,
+        lastResult: null,
+        revealedAnswer: null,
+        timerEndsAt: null,
+      },
+      $inc: { version: 1 },
+    }
+  );
 }
 
 export async function startTimer(roomId: string, customSeconds?: number) {
@@ -748,7 +728,6 @@ export async function startTimer(roomId: string, customSeconds?: number) {
       $inc: { version: 1 },
     }
   );
-  notifyRoomChanged(canonicalId, room.code);
 }
 
 export async function stopTimer(roomId: string) {
@@ -765,7 +744,6 @@ export async function stopTimer(roomId: string) {
       $inc: { version: 1 },
     }
   );
-  notifyRoomChanged(canonicalId, room.code);
 }
 
 export async function setRoomTimerDefault(roomId: string, seconds: number) {
@@ -782,7 +760,6 @@ export async function setRoomTimerDefault(roomId: string, seconds: number) {
       $inc: { version: 1 },
     }
   );
-  notifyRoomChanged(canonicalId, room.code);
 }
 
 export async function markCorrect(
@@ -827,42 +804,38 @@ export async function markCorrect(
 
   // Award points: auto add question.points
   const points = question.points ?? 10;
-  const rooms = await getRoomsCollection();
-
-  const updatePromises: Promise<unknown>[] = [
-    contestants.updateOne(
-      { id: contestant.id },
-      { $set: { score: contestant.score + points } }
-    ),
-    questions.updateOne(
-      { id: question.id },
-      { $set: { status: 'done', answeredBy: contestant.id } }
-    ),
-    rooms.updateOne(
-      { id: canonicalId },
-      {
-        $set: {
-          lastResult: 'correct',
-          revealedAnswer: question.correctAnswer,
-          timerEndsAt: null,
-        },
-        $inc: { version: 1 },
-      }
-    ),
-  ];
+  await contestants.updateOne(
+    { id: contestant.id },
+    { $set: { score: contestant.score + points } }
+  );
 
   // If this contestant is an individual in rapid fire, award points to parent group directly too
   if (contestant.kind === 'individual' && contestant.parentGroupId) {
-    updatePromises.push(
-      contestants.updateOne(
-        { id: contestant.parentGroupId },
-        { $inc: { score: points } }
-      )
+    await contestants.updateOne(
+      { id: contestant.parentGroupId },
+      { $inc: { score: points } }
     );
   }
 
-  await Promise.all(updatePromises);
-  notifyRoomChanged(canonicalId, room.code);
+  // Mark question done
+  await questions.updateOne(
+    { id: question.id },
+    { $set: { status: 'done', answeredBy: contestant.id } }
+  );
+
+  // Update room
+  const rooms = await getRoomsCollection();
+  await rooms.updateOne(
+    { id: canonicalId },
+    {
+      $set: {
+        lastResult: 'correct',
+        revealedAnswer: question.correctAnswer,
+        timerEndsAt: null,
+      },
+      $inc: { version: 1 },
+    }
+  );
 
   return {
     success: true,
@@ -894,7 +867,6 @@ export async function markWrong(roomId: string) {
       $inc: { version: 1 },
     }
   );
-  notifyRoomChanged(canonicalId, room.code);
 }
 
 export async function passQuestion(roomId: string) {
@@ -921,29 +893,25 @@ export async function passQuestion(roomId: string) {
 
   // If all groups have had their chance, close the question with revealed answer
   if (room.passCount >= groups.length - 1) {
-    const [questions, rooms] = await Promise.all([
-      getQuestionsCollection(),
-      getRoomsCollection(),
-    ]);
+    const questions = await getQuestionsCollection();
     const q = await questions.findOne({ id: room.currentQuestionId });
-    await Promise.all([
-      questions.updateOne(
-        { id: room.currentQuestionId },
-        { $set: { status: 'done' } }
-      ),
-      rooms.updateOne(
-        { id: canonicalId },
-        {
-          $set: {
-            timerEndsAt: null,
-            lastResult: 'wrong',
-            revealedAnswer: q?.correctAnswer || null,
-          },
-          $inc: { version: 1 },
-        }
-      ),
-    ]);
-    notifyRoomChanged(canonicalId, room.code);
+    await questions.updateOne(
+      { id: room.currentQuestionId },
+      { $set: { status: 'done' } }
+    );
+
+    const rooms = await getRoomsCollection();
+    await rooms.updateOne(
+      { id: canonicalId },
+      {
+        $set: {
+          timerEndsAt: null,
+          lastResult: 'wrong',
+          revealedAnswer: q?.correctAnswer || null,
+        },
+        $inc: { version: 1 },
+      }
+    );
     return { closed: true, revealedAnswer: q?.correctAnswer || null };
   }
 
@@ -968,7 +936,6 @@ export async function passQuestion(roomId: string) {
       $inc: { version: 1 },
     }
   );
-  notifyRoomChanged(canonicalId, room.code);
 
   return { nextContestantId: nextGroup.id, passCount: room.passCount + 1 };
 }
@@ -1009,7 +976,6 @@ export async function nextTurn(roomId: string) {
         $inc: { version: 1 },
       }
     );
-    notifyRoomChanged(canonicalId, room.code);
     return;
   }
 
@@ -1029,7 +995,6 @@ export async function nextTurn(roomId: string) {
       $inc: { version: 1 },
     }
   );
-  notifyRoomChanged(canonicalId, room.code);
 }
 
 export async function closeQuestion(roomId: string) {
@@ -1038,32 +1003,26 @@ export async function closeQuestion(roomId: string) {
   if (!room || !room.currentQuestionId) return;
   const canonicalId = room.id;
 
-  const [questions, rooms] = await Promise.all([
-    getQuestionsCollection(),
-    getRoomsCollection(),
-  ]);
+  const questions = await getQuestionsCollection();
+  await questions.updateOne(
+    { id: room.currentQuestionId },
+    { $set: { status: 'done' } }
+  );
 
-  await Promise.all([
-    questions.updateOne(
-      { id: room.currentQuestionId },
-      { $set: { status: 'done' } }
-    ),
-    rooms.updateOne(
-      { id: canonicalId },
-      {
-        $set: {
-          currentQuestionId: null,
-          timerEndsAt: null,
-          lastResult: null,
-          revealedAnswer: null,
-          passCount: 0,
-        },
-        $inc: { version: 1 },
-      }
-    ),
-  ]);
-
-  notifyRoomChanged(canonicalId, room.code);
+  const rooms = await getRoomsCollection();
+  await rooms.updateOne(
+    { id: canonicalId },
+    {
+      $set: {
+        currentQuestionId: null,
+        timerEndsAt: null,
+        lastResult: null,
+        revealedAnswer: null,
+        passCount: 0,
+      },
+      $inc: { version: 1 },
+    }
+  );
 }
 
 export async function revealQuestionAnswer(roomId: string) {
@@ -1133,29 +1092,25 @@ export async function chooseNormalQuestion(
     customDuration ?? question.timerSeconds ?? room.timerSeconds ?? 30;
   const timerEndsAt = new Date(Date.now() + duration * 1000);
 
+  await questions.updateOne(
+    { id: questionId },
+    { $set: { status: 'active' } }
+  );
+
   const rooms = await getRoomsCollection();
-
-  await Promise.all([
-    questions.updateOne(
-      { id: questionId },
-      { $set: { status: 'active' } }
-    ),
-    rooms.updateOne(
-      { id: canonicalId },
-      {
-        $set: {
-          currentQuestionId: questionId,
-          timerEndsAt,
-          lastResult: null,
-          revealedAnswer: null,
-          passCount: 0,
-        },
-        $inc: { version: 1 },
-      }
-    ),
-  ]);
-
-  notifyRoomChanged(canonicalId, room.code);
+  await rooms.updateOne(
+    { id: canonicalId },
+    {
+      $set: {
+        currentQuestionId: questionId,
+        timerEndsAt,
+        lastResult: null,
+        revealedAnswer: null,
+        passCount: 0,
+      },
+      $inc: { version: 1 },
+    }
+  );
 }
 
 function normalizeAnswer(text: string): string {
@@ -1344,8 +1299,6 @@ export async function submitAnswer(
         }
       );
 
-      notifyRoomChanged(canonicalId, room.code);
-
       return {
         success: true,
         correct: isCorrect,
@@ -1376,8 +1329,6 @@ export async function submitAnswer(
           $inc: { version: 1 },
         }
       );
-
-      notifyRoomChanged(canonicalId, room.code);
 
       return {
         success: true,
@@ -1458,8 +1409,6 @@ export async function submitAnswer(
       }
     );
 
-    notifyRoomChanged(canonicalId, room.code);
-
     return {
       success: true,
       correct: true,
@@ -1505,7 +1454,6 @@ export async function adjustScore(contestantId: string, delta: number) {
   if (room) {
     const rooms = await getRoomsCollection();
     await rooms.updateOne({ id: room.id }, { $inc: { version: 1 } });
-    notifyRoomChanged(room.id, room.code);
   }
 }
 
@@ -1603,8 +1551,6 @@ export async function selectRapidFireSet(
     }
   );
 
-  notifyRoomChanged(canonicalId, room.code);
-
   return { success: true, rapidFireState };
 }
 
@@ -1683,8 +1629,6 @@ export async function skipRapidFireQuestion(roomId: string, contestantId: string
       }
     );
   }
-
-  notifyRoomChanged(canonicalId, room.code);
 }
 
 export async function finishRapidFireSet(roomId: string) {
@@ -1712,8 +1656,6 @@ export async function finishRapidFireSet(roomId: string) {
       $inc: { version: 1 },
     }
   );
-
-  notifyRoomChanged(canonicalId, room.code);
 }
 
 export async function setRapidFireTimeLimit(roomId: string, seconds: number) {
@@ -1729,8 +1671,6 @@ export async function setRapidFireTimeLimit(roomId: string, seconds: number) {
       $inc: { version: 1 },
     }
   );
-
-  notifyRoomChanged(room.id, room.code);
 }
 
 export async function startRapidFireForGroup(
