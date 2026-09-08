@@ -84,11 +84,6 @@ export function ScoreBoard({
       return;
     }
 
-    if (groups.length >= 8) {
-      setAddError('Room is full (8 teams maximum).');
-      return;
-    }
-
     setIsSubmittingGroup(true);
     try {
       await adminAddGroup(roomId, cleanName);
@@ -115,29 +110,15 @@ export function ScoreBoard({
             Leaderboard
           </h3>
         </div>
-        <div className="flex items-center gap-2.5">
-          {/* 8-Slot Live Indicator Dots */}
-          <div className="flex items-center gap-1" title={`${groups.length} of 8 slots filled`}>
-            {Array.from({ length: 8 }).map((_, i) => (
-              <span
-                key={i}
-                className={`w-1.5 h-1.5 rounded-full transition-all ${
-                  i < groups.length
-                    ? 'bg-blue-600 shadow-xs'
-                    : 'bg-slate-200'
-                }`}
-              />
-            ))}
-          </div>
-          <span
-            className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
-              groups.length >= 8
-                ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                : 'text-slate-600 bg-slate-100 border border-slate-200'
-            }`}
-          >
-            {groups.length}/8
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 shadow-2xs">
+            {groups.length} {groups.length === 1 ? 'Team' : 'Teams'}
           </span>
+          {isAdmin && (
+            <span className="text-[9px] font-black uppercase text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+              Expandable
+            </span>
+          )}
         </div>
       </div>
 
@@ -147,12 +128,11 @@ export function ScoreBoard({
           {!isAddingGroup ? (
             <button
               type="button"
-              disabled={groups.length >= 8}
               onClick={() => setIsAddingGroup(true)}
-              className="w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-2xl border border-dashed border-blue-200 text-xs font-bold text-blue-700 hover:text-blue-800 hover:bg-blue-50/70 transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs"
+              className="w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-2xl border border-dashed border-blue-200 text-xs font-bold text-blue-700 hover:text-blue-800 hover:bg-blue-50/70 transition-all shadow-2xs cursor-pointer"
             >
               <UserPlus className="w-3.5 h-3.5 text-blue-600" />
-              <span>{groups.length >= 8 ? '8 Slots Full' : '+ Add Team'}</span>
+              <span>+ Add Team (#{groups.length + 1})</span>
             </button>
           ) : (
             <form

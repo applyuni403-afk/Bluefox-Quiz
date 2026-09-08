@@ -44,9 +44,9 @@ export default function Home() {
         </div>
 
         <h1 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight text-slate-900 max-w-3xl leading-[1.12] mb-3">
-          Precision trivia for up to{' '}
+          Precision trivia for{' '}
           <span className="bg-gradient-to-r from-blue-700 via-indigo-600 to-sky-600 bg-clip-text text-transparent">
-            8 live teams.
+            expandable live teams.
           </span>
         </h1>
 
@@ -87,7 +87,7 @@ export default function Home() {
               </div>
               <h3 className="text-lg font-black text-slate-900 mb-1">Host Command</h3>
               <p className="text-xs text-slate-600 leading-relaxed">
-                Launch questions, manage 8 teams, orchestrate timers, and score answers.
+                Launch questions, manage expandable teams, orchestrate timers, and score answers.
               </p>
             </div>
             <div className="flex items-center gap-1.5 text-amber-600 font-bold text-xs uppercase tracking-wider mt-4 group-hover:translate-x-1 transition-transform">
@@ -100,7 +100,7 @@ export default function Home() {
         {/* Feature Strip */}
         <div className="flex flex-wrap items-center justify-center gap-2 max-w-xl text-[11px] font-semibold text-slate-600 mb-3 sm:mb-4">
           <span className="px-3 py-1 rounded-full bg-white/85 border border-blue-100 flex items-center gap-1.5 shadow-2xs">
-            <Zap className="w-3.5 h-3.5 text-amber-500" /> 8-Team Live Sync
+            <Zap className="w-3.5 h-3.5 text-amber-500" /> Multi-Team Live Sync
           </span>
           <span className="px-3 py-1 rounded-full bg-white/85 border border-blue-100 flex items-center gap-1.5 shadow-2xs">
             <Flame className="w-3.5 h-3.5 text-rose-500" /> Rapid Fire Matrix

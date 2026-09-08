@@ -100,6 +100,12 @@ export async function createRoom(name: string): Promise<Room> {
     timerSeconds: 30,
     passCount: 0,
     lastResult: null,
+    revealedAnswer: null,
+    rapidFireState: null,
+    usedSets: [],
+    setAssignments: {},
+    rapidFireSeconds: 60,
+    maxTeams: null,
     version: 1,
     createdAt: new Date(),
   };
@@ -203,8 +209,9 @@ export async function joinRoom(
       .find({ roomId: { $in: [room.id, room.code] }, kind: 'group' })
       .toArray();
 
-    if (existingGroups.length >= 8) {
-      return { success: false, error: 'Room is full (8 groups maximum).' };
+    const maxAllowed = room.maxTeams && room.maxTeams > 0 ? room.maxTeams : 64;
+    if (existingGroups.length >= maxAllowed) {
+      return { success: false, error: `Room is full (${maxAllowed} teams maximum).` };
     }
 
     const members = rawMembers
@@ -294,6 +301,9 @@ export async function checkRoomCapacity(codeOrId: string) {
       .find({ roomId: { $in: [room.id, room.code] }, kind: 'group' })
       .toArray();
 
+    const maxGroups = room.maxTeams || null;
+    const isFull = maxGroups !== null ? groups.length >= maxGroups : false;
+
     return {
       exists: true,
       roomId: room.id,
@@ -301,8 +311,8 @@ export async function checkRoomCapacity(codeOrId: string) {
       name: room.name,
       status: room.status,
       groupCount: groups.length,
-      maxGroups: 8,
-      isFull: groups.length >= 8,
+      maxGroups,
+      isFull,
     };
   } catch {
     return { exists: false };
@@ -339,7 +349,8 @@ export async function adminAddGroup(
   await assertAdmin();
 
   const room = await resolveRoom(roomId);
-  const canonicalId = room ? room.id : roomId;
+  if (!room) throw new Error('Room not found');
+  const canonicalId = room.id;
   const cleanName = groupName.trim();
   if (!cleanName) throw new Error('Group name cannot be empty');
 
@@ -349,8 +360,13 @@ export async function adminAddGroup(
     .find({ roomId: { $in: roomIds }, kind: 'group' })
     .toArray();
 
-  if (existingGroups.length >= 8) {
-    throw new Error('Room is full. Maximum 8 groups allowed.');
+  // If room has an explicit maxTeams limit and it is reached, auto-expand it for host
+  if (room.maxTeams && existingGroups.length >= room.maxTeams) {
+    const roomsColl = await getRoomsCollection();
+    await roomsColl.updateOne(
+      { id: canonicalId },
+      { $set: { maxTeams: existingGroups.length + 1 } }
+    );
   }
 
   const members = rawMembers.map((m) => m.trim()).filter((m) => m.length > 0);
@@ -374,6 +390,28 @@ export async function adminAddGroup(
   await rooms.updateOne({ id: canonicalId }, { $inc: { version: 1 } });
 
   return newGroup;
+}
+
+export async function setRoomMaxTeams(
+  roomId: string,
+  maxTeams: number | null
+): Promise<{ success: boolean; maxTeams: number | null }> {
+  await assertAdmin();
+  const room = await resolveRoom(roomId);
+  if (!room) return { success: false, maxTeams: null };
+  const canonicalId = room.id;
+
+  const validMax = maxTeams && maxTeams > 0 ? Math.max(2, Math.floor(maxTeams)) : null;
+  const rooms = await getRoomsCollection();
+  await rooms.updateOne(
+    { id: canonicalId },
+    {
+      $set: { maxTeams: validMax },
+      $inc: { version: 1 },
+    }
+  );
+
+  return { success: true, maxTeams: validMax };
 }
 
 export async function deleteRoom(roomId: string): Promise<{ success: boolean }> {
@@ -605,6 +643,10 @@ export async function resetGame(roomId: string) {
         timerEndsAt: null,
         passCount: 0,
         lastResult: null,
+        revealedAnswer: null,
+        rapidFireState: null,
+        usedSets: [],
+        setAssignments: {},
         roundType: 'normal',
       },
       $inc: { version: 1 },
@@ -639,6 +681,7 @@ export async function showQuestion(roomId: string, questionId: string) {
         currentQuestionId: questionId,
         passCount: 0,
         lastResult: null,
+        revealedAnswer: null,
         timerEndsAt: null,
       },
       $inc: { version: 1 },
@@ -716,6 +759,7 @@ export async function markCorrect(
   success: boolean;
   pointsAwarded?: number;
   contestantName?: string;
+  revealedAnswer?: string;
   error?: string;
 }> {
   await assertAdmin();
@@ -771,6 +815,7 @@ export async function markCorrect(
     {
       $set: {
         lastResult: 'correct',
+        revealedAnswer: question.correctAnswer,
         timerEndsAt: null,
       },
       $inc: { version: 1 },
@@ -781,6 +826,7 @@ export async function markCorrect(
     success: true,
     pointsAwarded: points,
     contestantName: contestant.name,
+    revealedAnswer: question.correctAnswer,
   };
 }
 
@@ -813,9 +859,10 @@ export async function passQuestion(roomId: string) {
 
   if (groups.length === 0) return;
 
-  // If all groups have had their chance, close the question with no points
+  // If all groups have had their chance, close the question with revealed answer
   if (room.passCount >= groups.length - 1) {
     const questions = await getQuestionsCollection();
+    const q = await questions.findOne({ id: room.currentQuestionId });
     await questions.updateOne(
       { id: room.currentQuestionId },
       { $set: { status: 'done' } }
@@ -827,12 +874,13 @@ export async function passQuestion(roomId: string) {
       {
         $set: {
           timerEndsAt: null,
-          lastResult: null,
+          lastResult: 'wrong',
+          revealedAnswer: q?.correctAnswer || null,
         },
         $inc: { version: 1 },
       }
     );
-    return { closed: true };
+    return { closed: true, revealedAnswer: q?.correctAnswer || null };
   }
 
   // Find next group in rotation
@@ -912,11 +960,372 @@ export async function closeQuestion(roomId: string) {
         currentQuestionId: null,
         timerEndsAt: null,
         lastResult: null,
+        revealedAnswer: null,
         passCount: 0,
       },
       $inc: { version: 1 },
     }
   );
+}
+
+export async function revealQuestionAnswer(roomId: string) {
+  await assertAdmin();
+  const room = await resolveRoom(roomId);
+  if (!room || !room.currentQuestionId) return;
+  const canonicalId = room.id;
+
+  const questions = await getQuestionsCollection();
+  const question = await questions.findOne({ id: room.currentQuestionId });
+  if (!question) return;
+
+  await questions.updateOne(
+    { id: question.id },
+    { $set: { status: 'done' } }
+  );
+
+  const rooms = await getRoomsCollection();
+  await rooms.updateOne(
+    { id: canonicalId },
+    {
+      $set: {
+        timerEndsAt: null,
+        lastResult: null,
+        revealedAnswer: question.correctAnswer,
+      },
+      $inc: { version: 1 },
+    }
+  );
+}
+
+export async function proceedToNextNumber(roomId: string) {
+  const room = await resolveRoom(roomId);
+  if (!room) return;
+  const canonicalId = room.id;
+
+  const rooms = await getRoomsCollection();
+  await rooms.updateOne(
+    { id: canonicalId },
+    {
+      $set: {
+        currentQuestionId: null,
+        timerEndsAt: null,
+        lastResult: null,
+        revealedAnswer: null,
+        passCount: 0,
+      },
+      $inc: { version: 1 },
+    }
+  );
+}
+
+export async function chooseNormalQuestion(
+  roomId: string,
+  questionId: string,
+  customDuration?: number
+) {
+  const room = await resolveRoom(roomId);
+  if (!room) return;
+  const canonicalId = room.id;
+
+  const questions = await getQuestionsCollection();
+  const question = await questions.findOne({ id: questionId });
+  if (!question || question.status === 'done') return;
+
+  const duration =
+    customDuration ?? question.timerSeconds ?? room.timerSeconds ?? 30;
+  const timerEndsAt = new Date(Date.now() + duration * 1000);
+
+  await questions.updateOne(
+    { id: questionId },
+    { $set: { status: 'active' } }
+  );
+
+  const rooms = await getRoomsCollection();
+  await rooms.updateOne(
+    { id: canonicalId },
+    {
+      $set: {
+        currentQuestionId: questionId,
+        timerEndsAt,
+        lastResult: null,
+        revealedAnswer: null,
+        passCount: 0,
+      },
+      $inc: { version: 1 },
+    }
+  );
+}
+
+function normalizeAnswer(text: string): string {
+  return text
+    .trim()
+    .toLowerCase()
+    .replace(/^(the|a|an)\s+/i, '')
+    .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?"']/g, '')
+    .replace(/\s+/g, ' ');
+}
+
+function isAnswerCorrect(userAns: string, correctAns: string, qtype: string): boolean {
+  const cleanUser = userAns.trim();
+  const cleanCorrect = correctAns.trim();
+  if (!cleanUser || !cleanCorrect) return false;
+
+  if (cleanUser.toLowerCase() === cleanCorrect.toLowerCase()) return true;
+
+  const normUser = normalizeAnswer(cleanUser);
+  const normCorrect = normalizeAnswer(cleanCorrect);
+  if (normUser === normCorrect) return true;
+
+  if (qtype === 'mcq') {
+    if (normUser === normCorrect) return true;
+  }
+
+  const stripMount = (s: string) => s.replace(/\b(mount|mt)\b/gi, '').trim();
+  if (normalizeAnswer(stripMount(cleanUser)) === normalizeAnswer(stripMount(cleanCorrect))) {
+    return true;
+  }
+
+  return false;
+}
+
+export async function submitAnswer(
+  roomId: string,
+  contestantId: string,
+  rawAnswer: string
+): Promise<{
+  success: boolean;
+  correct?: boolean;
+  pointsAwarded?: number;
+  contestantName?: string;
+  revealedAnswer?: string;
+  passed?: boolean;
+  nextContestantId?: string;
+  allPassed?: boolean;
+  completed?: boolean;
+  error?: string;
+}> {
+  const cleanAnswer = rawAnswer.trim();
+  if (!cleanAnswer) {
+    return { success: false, error: 'Please enter an answer.' };
+  }
+
+  const room = await resolveRoom(roomId);
+  if (!room) return { success: false, error: 'Room not found.' };
+  const canonicalId = room.id;
+  const roomIds = [canonicalId, room.code].filter(Boolean) as string[];
+
+  // 1. RAPID FIRE MODE ANSWER SUBMISSION
+  if (room.roundType === 'rapid_fire') {
+    if (!room.rapidFireState || room.rapidFireState.status !== 'running') {
+      return { success: false, error: 'Rapid Fire round is not active.' };
+    }
+    if (
+      room.activeContestantId !== contestantId &&
+      room.rapidFireState.contestantId !== contestantId
+    ) {
+      return { success: false, error: 'It is not your turn.' };
+    }
+    if (!room.timerEndsAt || new Date() > new Date(room.timerEndsAt)) {
+      await finishRapidFireSet(canonicalId);
+      return { success: false, error: 'Rapid Fire timeline has expired!' };
+    }
+
+    const questions = await getQuestionsCollection();
+    const currentQ = room.currentQuestionId
+      ? await questions.findOne({ id: room.currentQuestionId })
+      : null;
+
+    if (!currentQ) {
+      return { success: false, error: 'No active question found in current set.' };
+    }
+
+    const contestants = await getContestantsCollection();
+    const contestant = await contestants.findOne({ id: contestantId });
+    if (!contestant) return { success: false, error: 'Contestant not found.' };
+
+    const isCorrect = isAnswerCorrect(cleanAnswer, currentQ.correctAnswer, currentQ.qtype);
+    const points = currentQ.points || 10;
+
+    let newCorrectCount = room.rapidFireState.correctCount;
+    let newScoreEarned = room.rapidFireState.scoreEarned;
+
+    if (isCorrect) {
+      newCorrectCount += 1;
+      newScoreEarned += points;
+      await contestants.updateOne(
+        { id: contestant.id },
+        { $inc: { score: points } }
+      );
+      if (contestant.kind === 'individual' && contestant.parentGroupId) {
+        await contestants.updateOne(
+          { id: contestant.parentGroupId },
+          { $inc: { score: points } }
+        );
+      }
+    }
+
+    await questions.updateOne(
+      { id: currentQ.id },
+      { $set: { status: 'done', answeredBy: isCorrect ? contestant.id : null } }
+    );
+
+    const setQuestions = await questions
+      .find({
+        roomId: { $in: roomIds },
+        roundType: 'rapid_fire',
+        setName: room.rapidFireState.activeSet,
+      })
+      .sort({ number: 1 })
+      .toArray();
+
+    const nextIndex = room.rapidFireState.questionIndex + 1;
+    const rooms = await getRoomsCollection();
+
+    if (nextIndex < setQuestions.length) {
+      const nextQ = setQuestions[nextIndex];
+      await questions.updateOne({ id: nextQ.id }, { $set: { status: 'active' } });
+
+      await rooms.updateOne(
+        { id: canonicalId },
+        {
+          $set: {
+            currentQuestionId: nextQ.id,
+            lastResult: isCorrect ? 'correct' : 'wrong',
+            'rapidFireState.questionIndex': nextIndex,
+            'rapidFireState.correctCount': newCorrectCount,
+            'rapidFireState.scoreEarned': newScoreEarned,
+          },
+          $inc: { version: 1 },
+        }
+      );
+
+      return {
+        success: true,
+        correct: isCorrect,
+        pointsAwarded: isCorrect ? points : 0,
+        contestantName: contestant.name,
+      };
+    } else {
+      await rooms.updateOne(
+        { id: canonicalId },
+        {
+          $set: {
+            currentQuestionId: null,
+            timerEndsAt: null,
+            lastResult: 'correct',
+            'rapidFireState.status': 'completed',
+            'rapidFireState.correctCount': newCorrectCount,
+            'rapidFireState.scoreEarned': newScoreEarned,
+          },
+          $inc: { version: 1 },
+        }
+      );
+
+      return {
+        success: true,
+        correct: isCorrect,
+        completed: true,
+        pointsAwarded: isCorrect ? points : 0,
+        contestantName: contestant.name,
+      };
+    }
+  }
+
+  // 2. NORMAL QUIZ MODE ANSWER SUBMISSION
+  if (room.activeContestantId !== contestantId) {
+    return { success: false, error: 'It is not your turn to answer!' };
+  }
+  if (!room.currentQuestionId) {
+    return { success: false, error: 'No active question.' };
+  }
+  if (!room.timerEndsAt || new Date() > new Date(room.timerEndsAt)) {
+    return { success: false, error: 'Time has expired for this question!' };
+  }
+
+  const questions = await getQuestionsCollection();
+  const question = await questions.findOne({ id: room.currentQuestionId });
+  if (!question) {
+    return { success: false, error: 'Question not found.' };
+  }
+
+  const contestants = await getContestantsCollection();
+  const contestant = await contestants.findOne({ id: contestantId });
+  if (!contestant) {
+    return { success: false, error: 'Contestant not found.' };
+  }
+
+  const isCorrect = isAnswerCorrect(cleanAnswer, question.correctAnswer, question.qtype);
+
+  if (isCorrect) {
+    const points = question.points || 10;
+    await contestants.updateOne(
+      { id: contestant.id },
+      { $inc: { score: points } }
+    );
+    if (contestant.kind === 'individual' && contestant.parentGroupId) {
+      await contestants.updateOne(
+        { id: contestant.parentGroupId },
+        { $inc: { score: points } }
+      );
+    }
+
+    await questions.updateOne(
+      { id: question.id },
+      { $set: { status: 'done', answeredBy: contestant.id } }
+    );
+
+    // Rotate active turn to next group for subsequent question choice
+    const allGroups = await contestants
+      .find({ roomId: { $in: roomIds }, kind: 'group' })
+      .sort({ joinOrder: 1 })
+      .toArray();
+    let nextTurnContestantId = contestant.id;
+    if (allGroups.length > 1) {
+      const idx = allGroups.findIndex((g) => g.id === contestant.id);
+      const nextIdx = idx === -1 ? 0 : (idx + 1) % allGroups.length;
+      nextTurnContestantId = allGroups[nextIdx].id;
+    }
+
+    const rooms = await getRoomsCollection();
+    await rooms.updateOne(
+      { id: canonicalId },
+      {
+        $set: {
+          lastResult: 'correct',
+          timerEndsAt: null,
+          revealedAnswer: question.correctAnswer,
+          activeContestantId: nextTurnContestantId,
+        },
+        $inc: { version: 1 },
+      }
+    );
+
+    return {
+      success: true,
+      correct: true,
+      pointsAwarded: points,
+      contestantName: contestant.name,
+      revealedAnswer: question.correctAnswer,
+    };
+  } else {
+    // WRONG ANSWER: pass turn to next group in rotation
+    const passResult = await passQuestion(canonicalId);
+    if (passResult && 'closed' in passResult && passResult.closed) {
+      return {
+        success: true,
+        correct: false,
+        allPassed: true,
+        revealedAnswer: question.correctAnswer,
+      };
+    }
+
+    return {
+      success: true,
+      correct: false,
+      passed: true,
+      nextContestantId: passResult?.nextContestantId,
+    };
+  }
 }
 
 export async function adjustScore(contestantId: string, delta: number) {
@@ -942,6 +1351,167 @@ export async function adjustScore(contestantId: string, delta: number) {
 // -------------------------------------------------------------
 // RAPID FIRE ACTIONS
 // -------------------------------------------------------------
+
+export async function selectRapidFireSet(
+  roomId: string,
+  setName: string,
+  contestantId: string,
+  timelineSeconds?: number
+) {
+  const cleanSetName = setName.trim();
+  const room = await resolveRoom(roomId);
+  if (!room) throw new Error('Room not found');
+  const canonicalId = room.id;
+  const roomIds = [canonicalId, room.code].filter(Boolean) as string[];
+
+  // Check if set is already taken
+  if (room.usedSets && room.usedSets.includes(cleanSetName)) {
+    throw new Error(`Set "${cleanSetName}" has already been chosen by another team.`);
+  }
+
+  const questions = await getQuestionsCollection();
+  const setQuestions = await questions
+    .find({
+      roomId: { $in: roomIds },
+      roundType: 'rapid_fire',
+      setName: cleanSetName,
+    })
+    .sort({ number: 1 })
+    .toArray();
+
+  if (setQuestions.length === 0) {
+    throw new Error(`No questions found in "${cleanSetName}".`);
+  }
+
+  const duration = timelineSeconds || room.rapidFireSeconds || 60;
+  const timerEndsAt = new Date(Date.now() + duration * 1000);
+
+  // Set first question active
+  await questions.updateOne({ id: setQuestions[0].id }, { $set: { status: 'active' } });
+
+  const rapidFireState = {
+    activeSet: cleanSetName,
+    contestantId,
+    questionIndex: 0,
+    totalQuestions: setQuestions.length,
+    correctCount: 0,
+    scoreEarned: 0,
+    status: 'running' as const,
+  };
+
+  const rooms = await getRoomsCollection();
+  await rooms.updateOne(
+    { id: canonicalId },
+    {
+      $set: {
+        roundType: 'rapid_fire',
+        activeContestantId: contestantId,
+        currentQuestionId: setQuestions[0].id,
+        timerEndsAt,
+        rapidFireState,
+        lastResult: null,
+        revealedAnswer: null,
+        [`setAssignments.${cleanSetName}`]: contestantId,
+      },
+      $addToSet: { usedSets: cleanSetName },
+      $inc: { version: 1 },
+    }
+  );
+
+  return { success: true, rapidFireState };
+}
+
+export async function skipRapidFireQuestion(roomId: string, contestantId: string) {
+  const room = await resolveRoom(roomId);
+  if (!room || !room.rapidFireState || room.rapidFireState.status !== 'running') return;
+  const canonicalId = room.id;
+  const roomIds = [canonicalId, room.code].filter(Boolean) as string[];
+
+  const questions = await getQuestionsCollection();
+  if (room.currentQuestionId) {
+    await questions.updateOne(
+      { id: room.currentQuestionId },
+      { $set: { status: 'done' } }
+    );
+  }
+
+  const setQuestions = await questions
+    .find({
+      roomId: { $in: roomIds },
+      roundType: 'rapid_fire',
+      setName: room.rapidFireState.activeSet,
+    })
+    .sort({ number: 1 })
+    .toArray();
+
+  const nextIndex = room.rapidFireState.questionIndex + 1;
+  const rooms = await getRoomsCollection();
+
+  if (nextIndex < setQuestions.length) {
+    const nextQ = setQuestions[nextIndex];
+    await questions.updateOne({ id: nextQ.id }, { $set: { status: 'active' } });
+
+    await rooms.updateOne(
+      { id: canonicalId },
+      {
+        $set: {
+          currentQuestionId: nextQ.id,
+          lastResult: 'wrong',
+          'rapidFireState.questionIndex': nextIndex,
+        },
+        $inc: { version: 1 },
+      }
+    );
+  } else {
+    // Set complete
+    await rooms.updateOne(
+      { id: canonicalId },
+      {
+        $set: {
+          currentQuestionId: null,
+          timerEndsAt: null,
+          lastResult: 'wrong',
+          'rapidFireState.status': 'completed',
+        },
+        $inc: { version: 1 },
+      }
+    );
+  }
+}
+
+export async function finishRapidFireSet(roomId: string) {
+  const room = await resolveRoom(roomId);
+  if (!room) return;
+  const canonicalId = room.id;
+
+  const rooms = await getRoomsCollection();
+  await rooms.updateOne(
+    { id: canonicalId },
+    {
+      $set: {
+        currentQuestionId: null,
+        timerEndsAt: null,
+        'rapidFireState.status': 'completed',
+      },
+      $inc: { version: 1 },
+    }
+  );
+}
+
+export async function setRapidFireTimeLimit(roomId: string, seconds: number) {
+  await assertAdmin();
+  const room = await resolveRoom(roomId);
+  if (!room) return;
+
+  const rooms = await getRoomsCollection();
+  await rooms.updateOne(
+    { id: room.id },
+    {
+      $set: { rapidFireSeconds: seconds },
+      $inc: { version: 1 },
+    }
+  );
+}
 
 export async function startRapidFireForGroup(
   roomId: string,
@@ -990,7 +1560,6 @@ export async function startRapidFireForIndividual(
 
   const contestants = await getContestantsCollection();
 
-  // Check if an individual entry for this member already exists in room
   let individual = await contestants.findOne({
     roomId: { $in: [canonicalId, room.code] },
     kind: 'individual',
@@ -1089,13 +1658,11 @@ export async function creditIndividualToGroup(
   const parentGroup = await contestants.findOne({ id: individual.parentGroupId });
   if (!parentGroup) return;
 
-  // Add individual's score to parent group
   await contestants.updateOne(
     { id: parentGroup.id },
     { $set: { score: parentGroup.score + individual.score } }
   );
 
-  // Reset individual score so it cannot be credited multiple times
   await contestants.updateOne(
     { id: individual.id },
     { $set: { score: 0 } }
@@ -1113,6 +1680,7 @@ export interface CreateQuestionInput {
   roomId: string;
   roundType: 'normal' | 'rapid_fire';
   roundName?: string;
+  setName?: string;
   number?: number;
   qtype: 'text' | 'mcq' | 'video' | 'audio';
   prompt: string;
@@ -1130,17 +1698,38 @@ export async function createQuestion(data: CreateQuestionInput): Promise<Questio
   const roomIds = [canonicalRoomId, room?.code].filter(Boolean) as string[];
 
   const questions = await getQuestionsCollection();
-
-  // If number wasn't provided for rapid fire, auto-increment
-  let qNumber = data.number ?? 1;
-  if (data.roundType === 'rapid_fire' && !data.number) {
-    const existing = await questions
-      .find({ roomId: { $in: roomIds }, roundType: 'rapid_fire' })
-      .toArray();
-    qNumber = existing.length + 1;
-  }
-
   const cleanRoundName = data.roundName?.trim() || null;
+  const cleanSetName = data.setName?.trim() || null;
+
+  let qNumber = data.number;
+  if (!qNumber) {
+    if (data.roundType === 'rapid_fire') {
+      if (cleanSetName) {
+        const existingInSet = await questions
+          .find({ roomId: { $in: roomIds }, roundType: 'rapid_fire', setName: cleanSetName })
+          .toArray();
+        qNumber = existingInSet.length + 1;
+      } else {
+        const existing = await questions
+          .find({ roomId: { $in: roomIds }, roundType: 'rapid_fire' })
+          .toArray();
+        qNumber = existing.length + 1;
+      }
+    } else {
+      // Normal round auto-number
+      if (cleanRoundName) {
+        const existingInRound = await questions
+          .find({ roomId: { $in: roomIds }, roundType: 'normal', roundName: cleanRoundName })
+          .toArray();
+        qNumber = existingInRound.length + 1;
+      } else {
+        const existing = await questions
+          .find({ roomId: { $in: roomIds }, roundType: 'normal' })
+          .toArray();
+        qNumber = existing.length + 1;
+      }
+    }
+  }
 
   const id = crypto.randomUUID();
   const question: Question = {
@@ -1149,7 +1738,8 @@ export async function createQuestion(data: CreateQuestionInput): Promise<Questio
     roomId: canonicalRoomId,
     roundType: data.roundType,
     roundName: cleanRoundName,
-    number: qNumber,
+    setName: cleanSetName,
+    number: qNumber || 1,
     qtype: data.qtype,
     prompt: data.prompt.trim(),
     options: data.options ?? [],
@@ -1216,11 +1806,12 @@ export async function getRoomQuestions(roomId: string): Promise<Question[]> {
   if (room) {
     return questions
       .find({ roomId: { $in: [room.id, room.code] } })
-      .sort({ roundName: 1, roundType: 1, number: 1 })
+      .sort({ roundName: 1, roundType: 1, setName: 1, number: 1 })
       .toArray();
   }
   return questions
     .find({ roomId })
-    .sort({ roundName: 1, roundType: 1, number: 1 })
+    .sort({ roundName: 1, roundType: 1, setName: 1, number: 1 })
     .toArray();
 }
+

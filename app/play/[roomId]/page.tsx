@@ -8,11 +8,18 @@ import { useTimer } from '@/lib/useTimer';
 import { Timer } from '@/components/Timer';
 import { QuestionCard } from '@/components/QuestionCard';
 import { ScoreBoard } from '@/components/ScoreBoard';
-import { RapidFireBoard } from '@/components/RapidFireBoard';
+import { NormalRoundBoard } from '@/components/NormalRoundBoard';
+import { RapidFireSetSelector } from '@/components/RapidFireSetSelector';
 import { SoundPlayer } from '@/components/SoundPlayer';
 import { SiteLogo } from '@/components/SiteLogo';
 import { useNotification } from '@/context/NotificationContext';
-import { logoutContestant } from '@/lib/actions';
+import {
+  logoutContestant,
+  chooseNormalQuestion,
+  selectRapidFireSet,
+  skipRapidFireQuestion,
+  proceedToNextNumber,
+} from '@/lib/actions';
 import {
   Users,
   SkipForward,
@@ -23,6 +30,11 @@ import {
   UserX,
   LogOut,
   CheckCircle2,
+  Send,
+  HelpCircle,
+  Flame,
+  Check,
+  ChevronRight,
 } from 'lucide-react';
 
 export default function PlayRoomPage({
@@ -33,13 +45,35 @@ export default function PlayRoomPage({
   const { roomId } = use(params);
   const router = useRouter();
   const { toast, confirm } = useNotification();
-  const { room, contestants, question, board, error, isLoading, mutate } =
-    useGameState(roomId);
+  const {
+    room,
+    contestants,
+    question,
+    board,
+    normalBoard,
+    rapidFireSets,
+    error,
+    isLoading,
+    mutate,
+  } = useGameState(roomId);
 
   const [myContestantId, setMyContestantId] = useState<string | null>(null);
   const [myClaimToken, setMyClaimToken] = useState<string | null>(null);
   const [passing, setPassing] = useState(false);
   const [passError, setPassError] = useState('');
+
+  // Contestant interactive answer input states
+  const [typedAnswer, setTypedAnswer] = useState('');
+  const [selectedOption, setSelectedOption] = useState<string | null>(null);
+  const [submittingAnswer, setSubmittingAnswer] = useState(false);
+  const [answerFeedback, setAnswerFeedback] = useState<string | null>(null);
+
+  // Reset answer states when active question changes
+  useEffect(() => {
+    setTypedAnswer('');
+    setSelectedOption(null);
+    setAnswerFeedback(null);
+  }, [question?.id]);
 
   // Read stored contestant id and claim token from localStorage & cookie
   useEffect(() => {
@@ -171,28 +205,108 @@ export default function PlayRoomPage({
     }
   };
 
-  // Rapid fire tile select
-  const handleSelectTile = async (questionId: string) => {
+  // Normal quiz question number select
+  const handleSelectNormalNumber = async (questionId: string) => {
     try {
-      const res = await fetch('/api/rapid-fire/choose', {
+      await chooseNormalQuestion(room?.id || roomId, questionId);
+      toast.success('Question Launched', 'Good luck!');
+      mutate();
+    } catch (err) {
+      toast.error('Selection Failed', (err as Error).message);
+    }
+  };
+
+  // Rapid fire set select
+  const handleSelectRapidFireSet = async (setName: string) => {
+    if (!myContestantId) {
+      toast.warning('Team Required', 'Please join or re-join as a team to play.');
+      return;
+    }
+    try {
+      await selectRapidFireSet(room?.id || roomId, setName, myContestantId);
+      toast.success('Rapid Fire Begun!', `Continuous countdown started for ${setName}!`);
+      mutate();
+    } catch (err) {
+      toast.error('Could Not Start Set', (err as Error).message);
+    }
+  };
+
+  // Rapid fire skip question
+  const handleSkipRapidFire = async () => {
+    if (!myContestantId || submittingAnswer) return;
+    try {
+      setSubmittingAnswer(true);
+      await skipRapidFireQuestion(room?.id || roomId, myContestantId);
+      mutate();
+    } catch (err) {
+      toast.error('Skip Failed', (err as Error).message);
+    } finally {
+      setSubmittingAnswer(false);
+    }
+  };
+
+  // Submit answer for Normal or Rapid Fire
+  const handleSubmitAnswer = async (e?: React.FormEvent, directAnswer?: string) => {
+    if (e) e.preventDefault();
+    const answerToSubmit = directAnswer || selectedOption || typedAnswer;
+    if (!answerToSubmit || !answerToSubmit.trim() || submittingAnswer || !myContestantId) return;
+
+    setSubmittingAnswer(true);
+    setAnswerFeedback(null);
+
+    try {
+      const res = await fetch('/api/answer', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           roomId: room?.id || roomId,
-          questionId,
           contestantId: myContestantId,
+          answer: answerToSubmit.trim(),
         }),
       });
+
+      const data = await res.json();
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Failed to select question');
+        throw new Error(data.error || 'Failed to submit answer');
       }
-      toast.success('Question Selected', 'Tile launched for your team.');
+
+      if (data.correct) {
+        setAnswerFeedback(`✓ Correct! +${data.pointsAwarded || question?.points || 10} PTS`);
+        toast.success('Correct Answer!', `+${data.pointsAwarded || 10} PTS awarded to your team!`);
+        setTypedAnswer('');
+        setSelectedOption(null);
+      } else {
+        if (data.allPassed) {
+          setAnswerFeedback(`Question finished. Correct answer: ${data.revealedAnswer}`);
+          toast.warning('Turn Over', `All teams tried! The correct answer was: ${data.revealedAnswer}`);
+        } else if (data.passed) {
+          setAnswerFeedback('Incorrect! Turn passed to next group.');
+          toast.warning('Incorrect', 'Turn passed to the next team in rotation.');
+        } else {
+          setAnswerFeedback('Incorrect! Next question...');
+          toast.warning('Incorrect Answer', 'Keep going!');
+        }
+        setTypedAnswer('');
+        setSelectedOption(null);
+      }
+
       mutate();
     } catch (err) {
       const msg = (err as Error).message;
-      console.error('Rapid fire error:', err);
-      toast.error('Selection Failed', msg || 'Could not select tile');
+      setAnswerFeedback(`Error: ${msg}`);
+      toast.error('Submission Failed', msg);
+    } finally {
+      setSubmittingAnswer(false);
+    }
+  };
+
+  // Normal mode proceed to next question
+  const handleProceedToNext = async () => {
+    try {
+      await proceedToNextNumber(room?.id || roomId);
+      mutate();
+    } catch (err) {
+      console.error(err);
     }
   };
 
@@ -296,7 +410,8 @@ export default function PlayRoomPage({
         <div className="w-full max-w-5xl mx-auto my-auto z-10 flex-1 min-h-0 flex flex-col justify-center overflow-y-auto py-2">
           {(() => {
             const groups = contestants.filter((c) => c.kind === 'group');
-            const isFull = groups.length >= 8;
+            const maxTeams = room.maxTeams || null;
+            const isFull = maxTeams !== null && groups.length >= maxTeams;
 
             return (
               <>
@@ -304,18 +419,19 @@ export default function PlayRoomPage({
                   <div className="flex items-center gap-2.5">
                     <h2 className="text-sm sm:text-base font-bold flex items-center gap-2 text-slate-900">
                       <Users className="w-4 h-4 text-blue-600" />
-                      <span>Teams Registered ({groups.length}/8)</span>
-                    </h2>
-                    {isFull && (
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-50 text-amber-700 border border-amber-200">
-                        Full (8/8)
+                      <span>
+                        Teams Registered ({groups.length}
+                        {maxTeams ? `/${maxTeams}` : ''})
                       </span>
-                    )}
+                    </h2>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      {isFull ? `Full (${groups.length}/${maxTeams})` : 'Expandable Roster'}
+                    </span>
                   </div>
                   <span className="text-xs text-slate-600 font-medium">
                     {isFull
-                      ? 'All 8 slots filled &bull; Host will start shortly'
-                      : `${8 - groups.length} slots remaining`}
+                      ? 'All slots filled &bull; Host will start shortly'
+                      : `${groups.length} ${groups.length === 1 ? 'team' : 'teams'} ready to compete`}
                   </span>
                 </div>
 
@@ -352,18 +468,27 @@ export default function PlayRoomPage({
                     );
                   })}
 
-                  {Array.from({ length: Math.max(0, 8 - groups.length) }).map((_, i) => (
-                    <div
-                      key={`empty-${i}`}
-                      className="p-4 rounded-2xl border border-dashed border-blue-200 bg-white/40 flex flex-col items-center justify-center text-center min-h-[100px]"
-                    >
-                      <Users className="w-4 h-4 text-slate-400 mb-1" />
-                      <span className="text-[11px] font-semibold text-slate-600 block">
-                        Slot #{groups.length + i + 1}
-                      </span>
-                      <span className="text-[9px] text-slate-400">Waiting for team...</span>
-                    </div>
-                  ))}
+                  {/* Empty placeholder slots: show remaining placeholders if fewer than 4 or 8 */}
+                  {Array.from({
+                    length: Math.max(
+                      0,
+                      (maxTeams || (groups.length < 8 ? 8 : Math.ceil(groups.length / 4) * 4)) -
+                        groups.length
+                    ),
+                  })
+                    .slice(0, 4)
+                    .map((_, i) => (
+                      <div
+                        key={`empty-${i}`}
+                        className="p-4 rounded-2xl border border-dashed border-blue-200 bg-white/40 flex flex-col items-center justify-center text-center min-h-[100px]"
+                      >
+                        <Users className="w-4 h-4 text-slate-400 mb-1" />
+                        <span className="text-[11px] font-semibold text-slate-600 block">
+                          Team #{groups.length + i + 1}
+                        </span>
+                        <span className="text-[9px] text-slate-400">Waiting to join...</span>
+                      </div>
+                    ))}
                 </div>
               </>
             );
@@ -497,67 +622,329 @@ export default function PlayRoomPage({
           <div className="flex items-center justify-between bg-white/85 backdrop-blur-xl border border-blue-100 rounded-2xl px-4 py-2.5 shadow-2xs shrink-0">
             <div className="flex items-center gap-2 text-slate-500 text-xs font-bold uppercase tracking-wider">
               <Clock className="w-3.5 h-3.5 text-blue-600" />
-              <span>Round Timer</span>
+              <span>
+                {room.roundType === 'rapid_fire' && room.rapidFireState?.status === 'running'
+                  ? `Rapid Fire Timeline (${room.rapidFireState.activeSet})`
+                  : 'Round Timer'}
+              </span>
             </div>
             <Timer endsAt={room.timerEndsAt} size="md" />
           </div>
 
-          {/* Question Stage */}
+          {/* Normal Round Stage */}
           {room.roundType === 'normal' && (
-            <div className="shrink-0">
+            <div className="space-y-3 shrink-0">
               {question ? (
-                <QuestionCard question={question} showAnswer={false} />
-              ) : (
-                <div className="p-10 text-center bg-white/60 border border-dashed border-blue-200 rounded-3xl text-slate-500 shadow-2xs">
-                  <Sparkles className="w-7 h-7 mx-auto mb-2 text-blue-600 opacity-60 animate-pulse" />
-                  <h3 className="text-base font-bold text-slate-900 mb-1">
-                    Ready for Next Question
-                  </h3>
-                  <p className="text-xs text-slate-500">
-                    The quizmaster will launch the next question shortly.
-                  </p>
+                <div className="space-y-3">
+                  <QuestionCard
+                    question={question}
+                    showAnswer={false}
+                    interactive={isMyTurn && isTimerRunning && !question.revealedAnswer}
+                    selectedOption={selectedOption}
+                    onSelectOption={(opt) => setSelectedOption(opt)}
+                  />
+
+                  {/* Contestant Interactive Answering Section (Active Turn) */}
+                  {isMyTurn && isTimerRunning && !question.revealedAnswer && (
+                    <div className="p-4 bg-white/95 backdrop-blur-xl border-2 border-blue-400 rounded-2xl shadow-md space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-black uppercase tracking-wider text-blue-800 flex items-center gap-1.5">
+                          <Sparkles className="w-3.5 h-3.5 text-blue-600 animate-spin" />
+                          <span>Your Team's Turn — Answer Now!</span>
+                        </span>
+                        <span className="text-[11px] font-bold text-slate-500">
+                          {question.qtype === 'mcq' ? 'Select an Option' : 'Type Your Answer'}
+                        </span>
+                      </div>
+
+                      {question.qtype === 'mcq' ? (
+                        <div className="space-y-2.5">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            {(question.options || []).map((opt, idx) => {
+                              const letter = String.fromCharCode(65 + idx);
+                              const isSel = selectedOption === opt;
+                              return (
+                                <button
+                                  key={idx}
+                                  type="button"
+                                  onClick={() => setSelectedOption(opt)}
+                                  className={`py-2 px-3 rounded-xl border text-xs font-bold flex items-center gap-2 transition active:scale-95 cursor-pointer text-left ${
+                                    isSel
+                                      ? 'bg-blue-600 text-white border-blue-700 shadow-xs'
+                                      : 'bg-slate-50 hover:bg-slate-100 text-slate-800 border-slate-200'
+                                  }`}
+                                >
+                                  <span
+                                    className={`w-5 h-5 rounded flex items-center justify-center text-[10px] font-black shrink-0 ${
+                                      isSel
+                                        ? 'bg-white text-blue-600'
+                                        : 'bg-white border border-slate-200 text-slate-700'
+                                    }`}
+                                  >
+                                    {letter}
+                                  </span>
+                                  <span className="truncate">{opt}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+
+                          <div className="flex items-center gap-2 pt-1">
+                            <button
+                              type="button"
+                              disabled={!selectedOption || submittingAnswer}
+                              onClick={() => handleSubmitAnswer(undefined, selectedOption || undefined)}
+                              className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-black text-xs uppercase tracking-wider shadow-md shadow-blue-500/25 flex items-center justify-center gap-1.5 transition active:scale-95 disabled:opacity-50 cursor-pointer"
+                            >
+                              {submittingAnswer ? (
+                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                              ) : (
+                                <>
+                                  <Send className="w-3.5 h-3.5" />
+                                  <span>Submit Selected Option</span>
+                                </>
+                              )}
+                            </button>
+
+                            <button
+                              type="button"
+                              disabled={passing}
+                              onClick={handlePass}
+                              className="py-2.5 px-3.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs uppercase tracking-wider flex items-center gap-1 transition cursor-pointer shrink-0"
+                            >
+                              <SkipForward className="w-3.5 h-3.5" />
+                              <span>Pass</span>
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <form onSubmit={handleSubmitAnswer} className="space-y-2">
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              value={typedAnswer}
+                              onChange={(e) => setTypedAnswer(e.target.value)}
+                              placeholder="Type your answer here..."
+                              autoFocus
+                              className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs sm:text-sm text-slate-900 focus:outline-none focus:border-blue-500 font-semibold"
+                            />
+                            <button
+                              type="submit"
+                              disabled={!typedAnswer.trim() || submittingAnswer}
+                              className="py-2 px-4 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-black text-xs uppercase tracking-wider shadow-md shadow-blue-500/25 flex items-center justify-center gap-1.5 transition active:scale-95 disabled:opacity-50 cursor-pointer"
+                            >
+                              {submittingAnswer ? (
+                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                              ) : (
+                                <>
+                                  <Send className="w-3.5 h-3.5" />
+                                  <span>Submit</span>
+                                </>
+                              )}
+                            </button>
+                            <button
+                              type="button"
+                              disabled={passing}
+                              onClick={handlePass}
+                              className="py-2 px-3.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs uppercase tracking-wider flex items-center gap-1 transition cursor-pointer"
+                            >
+                              <SkipForward className="w-3.5 h-3.5" />
+                              <span>Pass</span>
+                            </button>
+                          </div>
+                        </form>
+                      )}
+
+                      {answerFeedback && (
+                        <p className="text-xs font-bold text-indigo-700">{answerFeedback}</p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Other Teams Waiting Indicator */}
+                  {!isMyTurn && isTimerRunning && !question.revealedAnswer && (
+                    <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-between text-xs text-slate-600">
+                      <span className="flex items-center gap-2">
+                        <Clock className="w-4 h-4 text-blue-600 animate-spin" />
+                        <span>
+                          <strong>{activeContestant?.name || 'Active Team'}</strong> is answering...
+                        </span>
+                      </span>
+                      <span className="text-[11px] font-bold text-slate-400">
+                        Pass will rotate to you if unanswered
+                      </span>
+                    </div>
+                  )}
+
+                  {/* When question finished or revealed, proceed button */}
+                  {question.revealedAnswer && (
+                    <div className="p-3.5 rounded-2xl bg-white/90 border border-blue-200 flex flex-wrap items-center justify-between gap-3 shadow-2xs">
+                      <span className="text-xs text-slate-700 font-medium">
+                        Question concluded. Ready for next question number!
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleProceedToNext}
+                        className="py-2 px-3.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-1 transition active:scale-95 cursor-pointer shadow-xs"
+                      >
+                        <span>Choose Next Number</span>
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
                 </div>
+              ) : (
+                /* No Question Active -> Question Number Board */
+                <NormalRoundBoard
+                  board={normalBoard || []}
+                  roundName={room.currentRoundName}
+                  activeQuestionId={room.currentQuestionId}
+                  isInteractive={isMyTurn}
+                  activeTeamName={activeContestant?.name}
+                  onSelectNumber={handleSelectNormalNumber}
+                />
               )}
             </div>
           )}
 
-          {/* Rapid Fire Mode */}
+          {/* Rapid Fire Stage */}
           {room.roundType === 'rapid_fire' && (
             <div className="space-y-3 shrink-0">
-              {question && <QuestionCard question={question} showAnswer={false} />}
-              <RapidFireBoard
-                board={board}
-                activeQuestionId={question?.id}
-                isInteractive={isMyTurn}
-                onSelectTile={handleSelectTile}
-              />
-            </div>
-          )}
+              {room.rapidFireState?.status === 'running' && question ? (
+                <div className="space-y-3">
+                  {/* Rapid Fire Progress Banner */}
+                  <div className="p-3 bg-gradient-to-r from-amber-500 via-amber-600 to-orange-600 rounded-2xl text-white shadow-md flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Flame className="w-5 h-5 fill-white animate-pulse" />
+                      <div>
+                        <span className="text-[10px] font-black uppercase tracking-widest opacity-90 block">
+                          {room.rapidFireState.activeSet} Rapid Fire Timeline
+                        </span>
+                        <span className="text-xs font-black">
+                          Question {room.rapidFireState.questionIndex + 1} of {room.rapidFireState.totalQuestions}
+                        </span>
+                      </div>
+                    </div>
 
-          {/* Pass Action Button */}
-          {isMyTurn && isTimerRunning && room.roundType === 'normal' && (
-            <div className="p-4 bg-gradient-to-r from-blue-50 via-indigo-50 to-amber-50 border border-blue-200 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 shadow-2xs shrink-0">
-              <div>
-                <h4 className="text-xs sm:text-sm font-black text-slate-900">Unsure of the answer?</h4>
-                <p className="text-[11px] text-slate-600">Pass turn to the next group in rotation.</p>
-                {passError && <p className="text-xs text-rose-600 font-bold mt-1">{passError}</p>}
-              </div>
+                    <div className="flex items-center gap-2">
+                      <span className="px-2.5 py-1 rounded-xl bg-white/20 text-xs font-black">
+                        {room.rapidFireState.correctCount} Correct
+                      </span>
+                      <span className="px-2.5 py-1 rounded-xl bg-white text-amber-900 text-xs font-black">
+                        +{room.rapidFireState.scoreEarned} PTS
+                      </span>
+                    </div>
+                  </div>
 
-              <button
-                type="button"
-                disabled={passing}
-                onClick={handlePass}
-                className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-black text-xs uppercase tracking-wider shadow-md shadow-blue-500/25 flex items-center justify-center gap-1.5 transition active:scale-95 disabled:opacity-50 cursor-pointer shrink-0"
-              >
-                {passing ? (
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <>
-                    <SkipForward className="w-3.5 h-3.5 fill-white" />
-                    <span>PASS TURN</span>
-                  </>
-                )}
-              </button>
+                  <QuestionCard
+                    question={question}
+                    showAnswer={false}
+                    interactive={isMyTurn && isTimerRunning}
+                    selectedOption={selectedOption}
+                    onSelectOption={(opt) => {
+                      setSelectedOption(opt);
+                      handleSubmitAnswer(undefined, opt);
+                    }}
+                  />
+
+                  {/* Fast Answering / Skip Controls */}
+                  {isMyTurn && isTimerRunning && (
+                    <div className="p-4 bg-white/95 backdrop-blur-xl border border-amber-300 rounded-2xl shadow-xs space-y-2.5">
+                      {question.qtype === 'mcq' ? (
+                        <div className="space-y-2">
+                          <div className="grid grid-cols-2 gap-2">
+                            {(question.options || []).map((opt, idx) => {
+                              const letter = String.fromCharCode(65 + idx);
+                              return (
+                                <button
+                                  key={idx}
+                                  type="button"
+                                  disabled={submittingAnswer}
+                                  onClick={() => handleSubmitAnswer(undefined, opt)}
+                                  className="py-2 px-3 rounded-xl border border-slate-200 bg-slate-50 hover:bg-amber-50 hover:border-amber-400 text-slate-800 text-xs font-bold flex items-center gap-2 transition active:scale-95 cursor-pointer text-left"
+                                >
+                                  <span className="w-5 h-5 rounded bg-white border border-slate-200 flex items-center justify-center text-[10px] font-black shrink-0">
+                                    {letter}
+                                  </span>
+                                  <span className="truncate">{opt}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                          <button
+                            type="button"
+                            disabled={submittingAnswer}
+                            onClick={handleSkipRapidFire}
+                            className="w-full py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-1 transition cursor-pointer"
+                          >
+                            <SkipForward className="w-3.5 h-3.5" />
+                            <span>Skip Question &rarr;</span>
+                          </button>
+                        </div>
+                      ) : (
+                        <form onSubmit={handleSubmitAnswer} className="flex gap-2">
+                          <input
+                            type="text"
+                            value={typedAnswer}
+                            onChange={(e) => setTypedAnswer(e.target.value)}
+                            placeholder="Type rapid answer..."
+                            autoFocus
+                            className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs sm:text-sm text-slate-900 focus:outline-none focus:border-amber-500 font-semibold"
+                          />
+                          <button
+                            type="submit"
+                            disabled={!typedAnswer.trim() || submittingAnswer}
+                            className="py-2 px-4 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-black text-xs uppercase tracking-wider shadow-md shadow-amber-500/25 flex items-center justify-center gap-1.5 transition active:scale-95 disabled:opacity-50 cursor-pointer"
+                          >
+                            <Send className="w-3.5 h-3.5" />
+                            <span>Submit</span>
+                          </button>
+                          <button
+                            type="button"
+                            disabled={submittingAnswer}
+                            onClick={handleSkipRapidFire}
+                            className="py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-xs uppercase tracking-wider flex items-center gap-1 transition cursor-pointer"
+                          >
+                            <SkipForward className="w-3.5 h-3.5" />
+                            <span>Skip</span>
+                          </button>
+                        </form>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ) : room.rapidFireState?.status === 'completed' ? (
+                /* Rapid Fire Set Summary */
+                <div className="p-6 text-center bg-white/90 backdrop-blur-xl border border-amber-200 rounded-3xl shadow-sm space-y-4">
+                  <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center mx-auto">
+                    <Crown className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-black text-slate-900 mb-1">
+                      {room.rapidFireState.activeSet} Completed!
+                    </h3>
+                    <p className="text-xs text-slate-600">
+                      Score: <strong className="text-slate-900">{room.rapidFireState.correctCount}</strong> / {room.rapidFireState.totalQuestions} questions correct (+{room.rapidFireState.scoreEarned} PTS)
+                    </p>
+                  </div>
+                  <RapidFireSetSelector
+                    sets={rapidFireSets || []}
+                    isInteractive={isMyTurn}
+                    activeTeamName={activeContestant?.name}
+                    defaultTimelineSeconds={room.rapidFireSeconds || 60}
+                    onSelectSet={handleSelectRapidFireSet}
+                  />
+                </div>
+              ) : (
+                /* No Set Active -> Rapid Fire Set Selector */
+                <RapidFireSetSelector
+                  sets={rapidFireSets || []}
+                  isInteractive={isMyTurn}
+                  activeTeamName={activeContestant?.name}
+                  defaultTimelineSeconds={room.rapidFireSeconds || 60}
+                  onSelectSet={handleSelectRapidFireSet}
+                />
+              )}
             </div>
           )}
         </div>

@@ -3,7 +3,9 @@
 import useSWR from 'swr';
 import type { Room, Contestant, Question } from '@/lib/db/schema';
 
-export type SafeQuestion = Omit<Question, 'correctAnswer'>;
+export interface SafeQuestion extends Omit<Question, 'correctAnswer'> {
+  revealedAnswer?: string | null;
+}
 
 export interface RapidFireTile {
   id: string;
@@ -11,11 +13,28 @@ export interface RapidFireTile {
   status: 'unused' | 'active' | 'done';
 }
 
+export interface NormalRoundTile {
+  id: string;
+  number: number;
+  status: 'unused' | 'active' | 'done';
+  roundName?: string | null;
+  points?: number;
+}
+
+export interface RapidFireSetItem {
+  setName: string;
+  questionCount: number;
+  isUsed: boolean;
+  usedByTeamName?: string | null;
+}
+
 export interface GameStateResponse {
   room: Room;
   contestants: Contestant[];
   question: SafeQuestion | null;
   board: RapidFireTile[];
+  normalBoard?: NormalRoundTile[];
+  rapidFireSets?: RapidFireSetItem[];
   error?: string;
 }
 
@@ -45,8 +64,11 @@ export function useGameState(roomId: string | undefined | null) {
     contestants: data?.contestants ?? [],
     question: data?.question ?? null,
     board: data?.board ?? [],
+    normalBoard: data?.normalBoard ?? [],
+    rapidFireSets: data?.rapidFireSets ?? [],
     error,
     mutate,
     isLoading,
   };
 }
+

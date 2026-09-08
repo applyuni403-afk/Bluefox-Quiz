@@ -1,3 +1,13 @@
+export interface RapidFireState {
+  activeSet: string | null;
+  contestantId: string | null;
+  questionIndex: number;
+  totalQuestions: number;
+  correctCount: number;
+  scoreEarned: number;
+  status: 'idle' | 'running' | 'completed';
+}
+
 export interface Room {
   id: string;
   _id: string;
@@ -13,6 +23,12 @@ export interface Room {
   timerSeconds: number; // room default, admin-adjustable
   passCount: number;
   lastResult: string | null; // drives sounds
+  revealedAnswer?: string | null; // answer shown when question ends/all pass
+  rapidFireState?: RapidFireState | null; // live rapid fire set state
+  usedSets?: string[]; // sets that have been taken/completed
+  setAssignments?: Record<string, string>; // mapping setName -> contestantId
+  rapidFireSeconds?: number; // duration for rapid fire set countdown (default 60s)
+  maxTeams?: number | null; // expandable max teams limit (null = dynamically expandable / unlimited)
   version: number; // bump on every change
   createdAt: Date;
 }
@@ -38,7 +54,8 @@ export interface Question {
   roomId: string;
   roundType: 'normal' | 'rapid_fire';
   roundName?: string | null; // custom round name e.g. "Round 1: General Knowledge"
-  number: number; // shown on rapid-fire board
+  setName?: string | null; // Rapid fire set e.g. "Set A", "Set B"
+  number: number; // shown on rapid-fire or normal round board
   qtype: 'text' | 'mcq' | 'video' | 'audio';
   prompt: string;
   options: string[] | null; // ["A", "B", "C", "D"] for mcq
@@ -49,3 +66,4 @@ export interface Question {
   status: 'unused' | 'active' | 'done';
   answeredBy: string | null;
 }
+

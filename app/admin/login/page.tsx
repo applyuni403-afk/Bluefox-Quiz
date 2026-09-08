@@ -400,7 +400,7 @@ export default function AdminLoginPage() {
               </div>
 
               <div className="mt-4 pt-3 border-t border-slate-100 text-[11px] text-slate-400">
-                <span>Hosts can configure questions, manage up to 8 teams, and control live timers.</span>
+                <span>Hosts can configure questions, manage expandable live teams, and control live timers.</span>
               </div>
             </div>
 

@@ -9,6 +9,8 @@ import { Timer } from '@/components/Timer';
 import { QuestionCard } from '@/components/QuestionCard';
 import { ScoreBoard } from '@/components/ScoreBoard';
 import { RapidFireBoard } from '@/components/RapidFireBoard';
+import { NormalRoundBoard } from '@/components/NormalRoundBoard';
+import { RapidFireSetSelector } from '@/components/RapidFireSetSelector';
 import { SoundPlayer } from '@/components/SoundPlayer';
 import {
   startGame,
@@ -29,6 +31,14 @@ import {
   getRoomQuestions,
   logoutAdminAction,
   setRoomActiveRound,
+  chooseNormalQuestion,
+  selectRapidFireSet,
+  skipRapidFireQuestion,
+  finishRapidFireSet,
+  revealQuestionAnswer,
+  proceedToNextNumber,
+  setRapidFireTimeLimit,
+  submitAnswer,
 } from '@/lib/actions';
 import {
   Play,
@@ -49,6 +59,8 @@ import {
   Radio,
   LogOut,
   Tag,
+  Eye,
+  ChevronRight,
 } from 'lucide-react';
 import useSWR from 'swr';
 import { SiteLogo } from '@/components/SiteLogo';
@@ -61,7 +73,8 @@ interface AdminRoomClientProps {
 export function AdminRoomClient({ roomId }: AdminRoomClientProps) {
   const router = useRouter();
   const { toast, confirm } = useNotification();
-  const { room, contestants, board, mutate } = useGameState(roomId);
+  const { room, contestants, board, normalBoard, rapidFireSets, mutate } =
+    useGameState(roomId);
   const { data: allQuestions = [] } = useSWR(
     ['admin_questions', roomId, room?.version],
     () => getRoomQuestions(roomId)
@@ -551,7 +564,7 @@ export function AdminRoomClient({ roomId }: AdminRoomClientProps) {
 
                 {/* Evaluation Action Buttons */}
                 <div className="space-y-2.5 pt-2">
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                  <div className="grid grid-cols-2 sm:grid-cols-6 gap-2">
                     <button
                       type="button"
                       disabled={isActionPending || !activeContestant}
@@ -568,9 +581,9 @@ export function AdminRoomClient({ roomId }: AdminRoomClientProps) {
                           }
                         })
                       }
-                      className="py-3 px-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 font-bold text-xs uppercase tracking-wider text-white shadow-md shadow-emerald-500/20 transition active:scale-95 flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                      className="py-2.5 px-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 font-bold text-xs uppercase tracking-wider text-white shadow-md shadow-emerald-500/20 transition active:scale-95 flex items-center justify-center gap-1 disabled:opacity-50 cursor-pointer"
                     >
-                      <CheckCircle2 className="w-4 h-4" />
+                      <CheckCircle2 className="w-3.5 h-3.5" />
                       <span className="truncate">Correct (+{activeHostQuestion.points})</span>
                     </button>
 
@@ -578,9 +591,9 @@ export function AdminRoomClient({ roomId }: AdminRoomClientProps) {
                       type="button"
                       disabled={isActionPending}
                       onClick={() => wrapAction(() => markWrong(room.id))}
-                      className="py-3 px-3 rounded-2xl bg-rose-600 hover:bg-rose-700 font-bold text-xs uppercase tracking-wider text-white shadow-md shadow-rose-500/20 transition active:scale-95 flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                      className="py-2.5 px-2 rounded-xl bg-rose-600 hover:bg-rose-700 font-bold text-xs uppercase tracking-wider text-white shadow-md shadow-rose-500/20 transition active:scale-95 flex items-center justify-center gap-1 disabled:opacity-50 cursor-pointer"
                     >
-                      <XCircle className="w-4 h-4" />
+                      <XCircle className="w-3.5 h-3.5" />
                       <span>Wrong</span>
                     </button>
 
@@ -588,21 +601,94 @@ export function AdminRoomClient({ roomId }: AdminRoomClientProps) {
                       type="button"
                       disabled={isActionPending}
                       onClick={() => wrapAction(() => passQuestion(room.id))}
-                      className="py-3 px-3 rounded-2xl bg-blue-600 hover:bg-blue-700 font-bold text-xs uppercase tracking-wider text-white shadow-md shadow-blue-500/20 transition active:scale-95 flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                      className="py-2.5 px-2 rounded-xl bg-blue-600 hover:bg-blue-700 font-bold text-xs uppercase tracking-wider text-white shadow-md shadow-blue-500/20 transition active:scale-95 flex items-center justify-center gap-1 disabled:opacity-50 cursor-pointer"
                     >
-                      <SkipForward className="w-4 h-4" />
+                      <SkipForward className="w-3.5 h-3.5" />
                       <span>Pass Turn</span>
                     </button>
 
                     <button
                       type="button"
                       disabled={isActionPending}
+                      onClick={() => wrapAction(() => revealQuestionAnswer(room.id))}
+                      className="py-2.5 px-2 rounded-xl bg-amber-500 hover:bg-amber-600 font-bold text-xs uppercase tracking-wider text-white shadow-md shadow-amber-500/20 transition active:scale-95 flex items-center justify-center gap-1 disabled:opacity-50 cursor-pointer"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      <span>Reveal</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={isActionPending}
+                      onClick={() => wrapAction(() => proceedToNextNumber(room.id))}
+                      className="py-2.5 px-2 rounded-xl bg-slate-800 hover:bg-slate-900 font-bold text-xs uppercase tracking-wider text-white shadow-md shadow-slate-900/20 transition active:scale-95 flex items-center justify-center gap-1 disabled:opacity-50 cursor-pointer"
+                    >
+                      <span>Next Q</span>
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={isActionPending}
                       onClick={() => wrapAction(() => closeQuestion(room.id))}
-                      className="py-3 px-3 rounded-2xl bg-slate-100 hover:bg-slate-200 font-bold text-xs uppercase tracking-wider text-slate-700 border border-slate-200 transition active:scale-95 flex items-center justify-center disabled:opacity-50 cursor-pointer"
+                      className="py-2.5 px-2 rounded-xl bg-slate-100 hover:bg-slate-200 font-bold text-xs uppercase tracking-wider text-slate-700 border border-slate-200 transition active:scale-95 flex items-center justify-center disabled:opacity-50 cursor-pointer"
                     >
                       <span>Done</span>
                     </button>
                   </div>
+
+                  {/* Rapid Fire Live Host Action Bar */}
+                  {room.roundType === 'rapid_fire' && room.rapidFireState?.status === 'running' && (
+                    <div className="p-3 bg-amber-50 rounded-xl border border-amber-300 flex flex-wrap items-center justify-between gap-2 text-xs">
+                      <div className="flex items-center gap-2">
+                        <Flame className="w-4 h-4 text-amber-600" />
+                        <span className="font-bold text-amber-950">
+                          Rapid Fire Live: Set {room.rapidFireState.activeSet} (Q{room.rapidFireState.questionIndex + 1}/{room.rapidFireState.totalQuestions})
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          disabled={isActionPending}
+                          onClick={() =>
+                            wrapAction(async () => {
+                              const res = await submitAnswer(room.id, activeContestant?.id || '', activeHostQuestion?.correctAnswer || '');
+                              if (res?.correct) toast.success('Correct!', 'Advanced to next question.');
+                            })
+                          }
+                          className="px-2.5 py-1 rounded-lg bg-emerald-600 text-white font-bold text-xs hover:bg-emerald-700"
+                        >
+                          +Pts & Next
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isActionPending}
+                          onClick={() =>
+                            wrapAction(async () => {
+                              await skipRapidFireQuestion(room.id, activeContestant?.id || '');
+                              toast.info('Skipped', 'Advanced to next question.');
+                            })
+                          }
+                          className="px-2.5 py-1 rounded-lg bg-slate-600 text-white font-bold text-xs hover:bg-slate-700"
+                        >
+                          Skip & Next
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isActionPending}
+                          onClick={() =>
+                            wrapAction(async () => {
+                              await finishRapidFireSet(room.id);
+                              toast.info('Stopped', 'Rapid fire set finished.');
+                            })
+                          }
+                          className="px-2.5 py-1 rounded-lg bg-rose-600 text-white font-bold text-xs hover:bg-rose-700"
+                        >
+                          Stop Set
+                        </button>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Direct Question Points Award to Another Team (if answered out of turn) */}
                   {groups.length > 1 && (
@@ -643,9 +729,9 @@ export function AdminRoomClient({ roomId }: AdminRoomClientProps) {
                 </div>
               </div>
             ) : (
-              <div className="p-8 text-center text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                <Clock className="w-7 h-7 mx-auto mb-2 opacity-40" />
-                <p className="text-xs font-semibold">Select a question from below to display live</p>
+              <div className="p-6 text-center text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                <Clock className="w-6 h-6 mx-auto mb-1.5 opacity-40" />
+                <p className="text-xs font-semibold">No active question on screen</p>
               </div>
             )}
 
@@ -697,17 +783,45 @@ export function AdminRoomClient({ roomId }: AdminRoomClientProps) {
             </div>
           </div>
 
-          {/* Rapid Fire Board (when rapid_fire) */}
-          {room.roundType === 'rapid_fire' && board.length > 0 && (
-            <RapidFireBoard
-              board={board}
+          {/* Normal Round Interactive Number Board (when no question active) */}
+          {room.roundType === 'normal' && !activeHostQuestion && (
+            <NormalRoundBoard
+              board={normalBoard || []}
+              roundName={room.currentRoundName}
               activeQuestionId={room.currentQuestionId}
               isInteractive={true}
-              onSelectTile={(qid) =>
-                wrapAction(() => chooseRapidFireQuestion(room.id, qid, customTimerSec))
+              activeTeamName={activeContestant?.name}
+              onSelectNumber={(qid) =>
+                wrapAction(() => chooseNormalQuestion(room.id, qid, customTimerSec))
               }
             />
           )}
+
+          {/* Rapid Fire Set Selector (when not actively running a set) */}
+          {room.roundType === 'rapid_fire' &&
+            room.rapidFireState?.status !== 'running' && (
+              <div className="space-y-3">
+                <RapidFireSetSelector
+                  sets={rapidFireSets || []}
+                  isInteractive={Boolean(activeContestant)}
+                  activeTeamName={activeContestant?.name}
+                  defaultTimelineSeconds={room.rapidFireSeconds || 60}
+                  onSelectSet={(sName) =>
+                    wrapAction(async () => {
+                      if (!activeContestant) {
+                        toast.warning('Select Team', 'Please select and activate a team first.');
+                        return;
+                      }
+                      await selectRapidFireSet(room.id, sName, activeContestant.id, customTimerSec);
+                      toast.success(
+                        'Rapid Fire Launched',
+                        `Started ${sName} for ${activeContestant.name}!`
+                      );
+                    })
+                  }
+                />
+              </div>
+            )}
 
           {/* Question Launcher Bank */}
           <div className="bg-white/85 backdrop-blur-2xl border border-blue-100 rounded-2xl p-4 shadow-2xs shrink-0">

@@ -290,12 +290,16 @@ function JoinForm() {
               <div className="truncate">
                 <span className="font-bold text-slate-900 block truncate">{capacity.name}</span>
                 <span className="text-[11px] opacity-80 text-slate-600">
-                  {capacity.isFull ? '8/8 full &bull; Reconnect only' : `${8 - (capacity.groupCount || 0)} slots open`}
+                  {capacity.isFull
+                    ? 'Room full &bull; Reconnect only'
+                    : capacity.maxGroups
+                    ? `${capacity.maxGroups - (capacity.groupCount || 0)} slots open`
+                    : 'Open for teams &bull; Expandable roster'}
                 </span>
               </div>
             </div>
             <span className="font-mono font-black text-xs bg-white px-2 py-0.5 rounded-lg border border-blue-200 text-blue-900 shrink-0 shadow-2xs">
-              {capacity.groupCount} / 8
+              {capacity.groupCount} {capacity.maxGroups ? `/ ${capacity.maxGroups}` : 'Teams'}
             </span>
           </div>
         )}

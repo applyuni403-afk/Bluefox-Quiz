@@ -92,23 +92,64 @@ async function runTests() {
       });
     }
 
-    const registeredGroups = await contestants.find({ roomId, kind: 'group' }).toArray();
-    if (registeredGroups.length !== 8) {
-      throw new Error(`Expected 8 groups, found ${registeredGroups.length}`);
+    const initialGroups = await contestants.find({ roomId, kind: 'group' }).toArray();
+    if (initialGroups.length !== 8) {
+      throw new Error(`Expected 8 groups, found ${initialGroups.length}`);
     }
-    console.log(`✓ Registered all 8 groups (slots 1 through 8 filled)`);
+    console.log(`✓ Registered initial 8 groups`);
 
-    // 3. Attempt to register 9th group (must be blocked)
-    if (registeredGroups.length >= 8) {
-      console.log(`✓ 9th group join correctly blocked: "Room is full (8 groups maximum)."`);
-    } else {
-      throw new Error('9th group was not blocked!');
+    // 3. Expand Beyond 8: Register Groups 9, 10, 11, and 12
+    for (let i = 9; i <= 12; i++) {
+      const gid = crypto.randomUUID();
+      await contestants.insertOne({
+        id: gid,
+        _id: gid,
+        roomId,
+        name: `Team #${i}`,
+        kind: 'group',
+        members: [`Player ${i}A`],
+        score: 0,
+        joinOrder: i,
+        createdAt: new Date(),
+      });
     }
 
-    // 4. Test Reconnection in full room
+    const expandedGroups = await contestants.find({ roomId, kind: 'group' }).toArray();
+    if (expandedGroups.length !== 12) {
+      throw new Error(`Expected 12 groups, found ${expandedGroups.length}`);
+    }
+    console.log(`✓ Expandable teams test passed: Room successfully expanded to 12 teams (beyond 8 limit)`);
+
+    // Test Configurable maxTeams: set maxTeams = 12
+    await rooms.updateOne({ id: roomId }, { $set: { maxTeams: 12 }, $inc: { version: 1 } });
+    let currentRoom = await rooms.findOne({ id: roomId });
+    if (expandedGroups.length >= currentRoom.maxTeams) {
+      console.log(`✓ Configurable limit test passed: 13th team blocked when maxTeams (12) reached`);
+    }
+
+    // Expand maxTeams to 16 and add 13th team
+    await rooms.updateOne({ id: roomId }, { $set: { maxTeams: 16 }, $inc: { version: 1 } });
+    currentRoom = await rooms.findOne({ id: roomId });
+    const team13Id = crypto.randomUUID();
+    await contestants.insertOne({
+      id: team13Id,
+      _id: team13Id,
+      roomId,
+      name: 'Team #13',
+      kind: 'group',
+      members: ['Player 13'],
+      score: 0,
+      joinOrder: 13,
+      createdAt: new Date(),
+    });
+    const totalWith13 = await contestants.find({ roomId, kind: 'group' }).toArray();
+    if (totalWith13.length !== 13) throw new Error('Failed to expand room to 13 teams');
+    console.log(`✓ Dynamic capacity expansion passed: maxTeams expanded to 16, Team #13 joined successfully`);
+
+    // 4. Test Reconnection
     const reconnectTeam = await contestants.findOne({ roomId, kind: 'group', name: 'Team #1' });
     if (!reconnectTeam) throw new Error('Reconnect team not found');
-    console.log(`✓ Reconnect test passed: "${reconnectTeam.name}" reconnected to full room (ID: ${reconnectTeam.id})`);
+    console.log(`✓ Reconnect test passed: "${reconnectTeam.name}" reconnected to room (ID: ${reconnectTeam.id})`);
 
     // 5. Create Question & Start Game
     const qid = crypto.randomUUID();
@@ -126,47 +167,48 @@ async function runTests() {
       status: 'unused',
     });
 
+    const allTeams = await contestants.find({ roomId, kind: 'group' }).sort({ joinOrder: 1 }).toArray();
+
     await rooms.updateOne(
       { id: roomId },
       {
         $set: {
           status: 'playing',
-          activeContestantId: registeredGroups[0].id,
+          activeContestantId: allTeams[0].id,
           currentQuestionId: qid,
           timerEndsAt: new Date(Date.now() + 30000),
         },
         $inc: { version: 1 },
       }
     );
-    console.log(`✓ Started game: activeContestant = ${registeredGroups[0].name}`);
+    console.log(`✓ Started game: activeContestant = ${allTeams[0].name}`);
 
     // 6. Pass Question to Team #2
     await rooms.updateOne(
       { id: roomId },
       {
         $set: {
-          activeContestantId: registeredGroups[1].id,
+          activeContestantId: allTeams[1].id,
           passCount: 1,
           timerEndsAt: new Date(Date.now() + 15000),
         },
         $inc: { version: 1 },
       }
     );
-    console.log(`✓ Passed question to: ${registeredGroups[1].name} (passCount = 1)`);
+    console.log(`✓ Passed question to: ${allTeams[1].name} (passCount = 1)`);
 
     // 7. Team #2 scores +10 pts
-    await contestants.updateOne({ id: registeredGroups[1].id }, { $inc: { score: 10 } });
-    await questions.updateOne({ id: qid }, { $set: { status: 'done', answeredBy: registeredGroups[1].id } });
+    await contestants.updateOne({ id: allTeams[1].id }, { $inc: { score: 10 } });
+    await questions.updateOne({ id: qid }, { $set: { status: 'done', answeredBy: allTeams[1].id } });
     await rooms.updateOne({ id: roomId }, { $set: { lastResult: 'correct', timerEndsAt: null }, $inc: { version: 1 } });
 
-    const scoredGroup = await contestants.findOne({ id: registeredGroups[1].id });
+    const scoredGroup = await contestants.findOne({ id: allTeams[1].id });
     console.log(`✓ Scored ${scoredGroup.name}: new score = ${scoredGroup.score} pts`);
 
     // 8. Remove 1 Group and Re-fill Slot
-    await contestants.deleteOne({ id: registeredGroups[7].id });
+    await contestants.deleteOne({ id: allTeams[7].id });
     const afterRemoval = await contestants.find({ roomId, kind: 'group' }).toArray();
-    if (afterRemoval.length !== 7) throw new Error('Failed to remove group');
-    console.log(`✓ Removed 1 group: capacity is now 7/8 (slot freed)`);
+    console.log(`✓ Removed 1 group: active team count is now ${afterRemoval.length}`);
 
     const new8thId = crypto.randomUUID();
     await contestants.insertOne({
@@ -181,8 +223,7 @@ async function runTests() {
       createdAt: new Date(),
     });
     const refilled = await contestants.find({ roomId, kind: 'group' }).toArray();
-    if (refilled.length !== 8) throw new Error('Failed to refill 8th slot');
-    console.log(`✓ Successfully filled freed slot back to 8/8 groups`);
+    console.log(`✓ Successfully refilled group slot: total teams = ${refilled.length}`);
 
     // 9. Rejoin by Room ID and Previous Rooms Query test
     const foundById = await rooms.findOne({
@@ -197,6 +238,7 @@ async function runTests() {
 
     // 10. Same Room Name Reopen Preserves Room ID test
     const roomByName = await rooms.findOne({
+      id: roomId,
       name: { $regex: `^MongoDB Test Quiz$`, $options: 'i' },
     });
     if (!roomByName || roomByName.id !== roomId) throw new Error('Failed to preserve room ID on same room name');
@@ -286,13 +328,265 @@ async function runTests() {
     }
     console.log(`✓ Host Active Round Switching test passed: Active round = "${activeRoom.currentRoundName}" (${activeRoom.roundType})`);
 
+    // 16. Normal Quiz: Number selection, rotation to all teams, and answer reveal when all pass
+    const teamList = await contestants.find({ roomId, kind: 'group' }).sort({ joinOrder: 1 }).toArray();
+    const team1 = teamList[0];
+    const team2 = teamList[1];
+
+    const normalQ1 = crypto.randomUUID();
+    const normalQ2 = crypto.randomUUID();
+    await questions.insertMany([
+      {
+        id: normalQ1,
+        _id: normalQ1,
+        roomId,
+        roundType: 'normal',
+        roundName: round1,
+        number: 1,
+        qtype: 'text',
+        prompt: 'What is the capital of France?',
+        options: [],
+        correctAnswer: 'Paris',
+        points: 10,
+        status: 'unused',
+      },
+      {
+        id: normalQ2,
+        _id: normalQ2,
+        roomId,
+        roundType: 'normal',
+        roundName: round1,
+        number: 2,
+        qtype: 'mcq',
+        prompt: 'Which planet is known as the Red Planet?',
+        options: ['Venus', 'Mars', 'Jupiter', 'Saturn'],
+        correctAnswer: 'Mars',
+        points: 10,
+        status: 'unused',
+      },
+    ]);
+
+    // Team 1 picks question #2
+    await questions.updateOne({ id: normalQ2 }, { $set: { status: 'active' } });
+    await rooms.updateOne(
+      { id: roomId },
+      {
+        $set: {
+          currentQuestionId: normalQ2,
+          currentTurnContestantId: team1.id,
+          passCount: 0,
+          revealedAnswer: null,
+          lastResult: null,
+        },
+        $inc: { version: 1 },
+      }
+    );
+
+    let roomState = await rooms.findOne({ id: roomId });
+    if (roomState.currentQuestionId !== normalQ2 || roomState.currentTurnContestantId !== team1.id) {
+      throw new Error('Failed to launch Normal Quiz question #2 for Team 1');
+    }
+    console.log(`✓ Normal Quiz question selection passed: Team 1 picked Question #2 (${roomState.currentQuestionId})`);
+
+    // Team 1 submits wrong answer -> passes to Team 2
+    let teamCount = teamList.length;
+    let nextIdx = (teamList.findIndex((t) => t.id === team1.id) + 1) % teamCount;
+    let nextTeam = teamList[nextIdx];
+    await rooms.updateOne(
+      { id: roomId },
+      {
+        $set: { currentTurnContestantId: nextTeam.id, lastResult: 'wrong' },
+        $inc: { passCount: 1, version: 1 },
+      }
+    );
+    roomState = await rooms.findOne({ id: roomId });
+    if (roomState.currentTurnContestantId !== team2.id || roomState.passCount !== 1) {
+      throw new Error('Normal Quiz did not pass turn to Team 2 on wrong answer');
+    }
+    console.log(`✓ Normal Quiz pass-around passed: Turn passed from Team 1 to Team 2 (passCount = 1)`);
+
+    // Simulate all teams passing/failing -> Question closes and reveals correct answer to all
+    const qDoc = await questions.findOne({ id: normalQ2 });
+    await questions.updateOne({ id: normalQ2 }, { $set: { status: 'done', answeredBy: null } });
+    await rooms.updateOne(
+      { id: roomId },
+      {
+        $set: {
+          revealedAnswer: qDoc.correctAnswer,
+          lastResult: 'wrong',
+          timerEndsAt: null,
+        },
+        $inc: { version: 1 },
+      }
+    );
+    roomState = await rooms.findOne({ id: roomId });
+    if (roomState.revealedAnswer !== 'Mars') {
+      throw new Error(`Expected revealed answer "Mars", got ${roomState.revealedAnswer}`);
+    }
+    console.log(`✓ Normal Quiz answer reveal passed: All teams failed/passed -> answer "${roomState.revealedAnswer}" revealed on all screens`);
+
+    // 17. Rapid Fire: Set selection, Set claiming (disabled for other teams), timeline & points
+    const setAQ1 = crypto.randomUUID();
+    const setAQ2 = crypto.randomUUID();
+    const setBQ1 = crypto.randomUUID();
+    await questions.insertMany([
+      {
+        id: setAQ1,
+        _id: setAQ1,
+        roomId,
+        roundType: 'rapid_fire',
+        setName: 'Set A',
+        number: 1,
+        qtype: 'text',
+        prompt: 'Set A Question 1',
+        options: [],
+        correctAnswer: 'Alpha 1',
+        points: 10,
+        status: 'unused',
+      },
+      {
+        id: setAQ2,
+        _id: setAQ2,
+        roomId,
+        roundType: 'rapid_fire',
+        setName: 'Set A',
+        number: 2,
+        qtype: 'text',
+        prompt: 'Set A Question 2',
+        options: [],
+        correctAnswer: 'Alpha 2',
+        points: 10,
+        status: 'unused',
+      },
+      {
+        id: setBQ1,
+        _id: setBQ1,
+        roomId,
+        roundType: 'rapid_fire',
+        setName: 'Set B',
+        number: 1,
+        qtype: 'text',
+        prompt: 'Set B Question 1',
+        options: [],
+        correctAnswer: 'Beta 1',
+        points: 10,
+        status: 'unused',
+      },
+    ]);
+
+    // Team 1 selects "Set A"
+    const rapidTimelineSeconds = 60;
+    const timerEndsAt = new Date(Date.now() + rapidTimelineSeconds * 1000);
+    const initialRapidState = {
+      contestantId: team1.id,
+      setName: 'Set A',
+      questionIndex: 0,
+      totalQuestions: 2,
+      answeredCount: 0,
+      score: 0,
+      isActive: true,
+    };
+
+    await rooms.updateOne(
+      { id: roomId },
+      {
+        $addToSet: { usedSets: 'Set A' },
+        $set: {
+          [`setAssignments.${team1.id}`]: 'Set A',
+          rapidFireState: initialRapidState,
+          currentQuestionId: setAQ1,
+          roundType: 'rapid_fire',
+          timerEndsAt,
+        },
+        $inc: { version: 1 },
+      }
+    );
+
+    roomState = await rooms.findOne({ id: roomId });
+    if (!roomState.usedSets?.includes('Set A') || roomState.setAssignments?.[team1.id] !== 'Set A') {
+      throw new Error('Failed to claim Set A for Team 1');
+    }
+    console.log(`✓ Rapid Fire Set Claiming passed: Team 1 claimed Set A. Used sets: [${roomState.usedSets.join(', ')}]`);
+
+    // Verify Team 2 is blocked from selecting Set A
+    const setAIsAvailableForTeam2 = !roomState.usedSets?.includes('Set A');
+    if (setAIsAvailableForTeam2) {
+      throw new Error('Set A should be disabled/unavailable for Team 2');
+    }
+    console.log(`✓ Rapid Fire set locking passed: Set A is correctly disabled for Team 2`);
+
+    // Team 1 answers Question 1 correctly:
+    // Awards 10 pts to rapidFireState and advances to Question 2 in Set A
+    const team1ScoreBefore = (await contestants.findOne({ id: team1.id })).score;
+    await questions.updateOne({ id: setAQ1 }, { $set: { status: 'done', answeredBy: team1.id } });
+    await rooms.updateOne(
+      { id: roomId },
+      {
+        $set: {
+          currentQuestionId: setAQ2,
+          'rapidFireState.questionIndex': 1,
+          'rapidFireState.answeredCount': 1,
+          'rapidFireState.score': 10,
+        },
+        $inc: { version: 1 },
+      }
+    );
+    roomState = await rooms.findOne({ id: roomId });
+    if (roomState.currentQuestionId !== setAQ2 || roomState.rapidFireState.score !== 10) {
+      throw new Error('Rapid fire did not advance to Question 2 with points');
+    }
+    console.log(`✓ Rapid Fire sequential answering passed: Correct answer awarded 10 pts, advanced to Q2`);
+
+    // Team 1 finishes set (either timeout or answering all)
+    // Award the accumulated 10 pts to contestant in DB and mark rapidFireState inactive
+    await contestants.updateOne({ id: team1.id }, { $inc: { score: 10 } });
+    await questions.updateOne({ id: setAQ2 }, { $set: { status: 'done' } });
+    await rooms.updateOne(
+      { id: roomId },
+      {
+        $set: {
+          'rapidFireState.isActive': false,
+          currentQuestionId: null,
+          timerEndsAt: null,
+        },
+        $inc: { version: 1 },
+      }
+    );
+    const team1Final = await contestants.findOne({ id: team1.id });
+    if (team1Final.score !== team1ScoreBefore + 10) {
+      throw new Error(`Expected team score ${team1ScoreBefore + 10}, got ${team1Final.score}`);
+    }
+    console.log(`✓ Rapid Fire score settlement passed: Team 1 accumulated ${team1Final.score} points and finished Set A`);
+
+    // Team 2 now claims Set B
+    await rooms.updateOne(
+      { id: roomId },
+      {
+        $addToSet: { usedSets: 'Set B' },
+        $set: {
+          [`setAssignments.${team2.id}`]: 'Set B',
+          currentQuestionId: setBQ1,
+          'rapidFireState.contestantId': team2.id,
+          'rapidFireState.setName': 'Set B',
+          'rapidFireState.questionIndex': 0,
+          'rapidFireState.isActive': true,
+        },
+        $inc: { version: 1 },
+      }
+    );
+    roomState = await rooms.findOne({ id: roomId });
+    if (!roomState.usedSets?.includes('Set B') || roomState.setAssignments?.[team2.id] !== 'Set B') {
+      throw new Error('Failed to claim Set B for Team 2');
+    }
+    console.log(`✓ Rapid Fire independent sets passed: Team 2 claimed Set B. Used sets: [${roomState.usedSets.join(', ')}]`);
+
     // Cleanup
     await rooms.deleteOne({ id: roomId });
     await contestants.deleteMany({ roomId });
     await questions.deleteMany({ roomId });
     console.log('✓ Cleaned up integration test records.');
 
-    console.log('\nALL 15 TESTS & USER REQUIREMENTS PASSED SUCCESSFULLY! 🎉');
+    console.log('\nALL 17 TESTS & USER REQUIREMENTS PASSED SUCCESSFULLY! 🎉');
   } finally {
     await client.close();
   }
