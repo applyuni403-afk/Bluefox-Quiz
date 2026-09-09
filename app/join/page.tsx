@@ -8,6 +8,7 @@ import { Play, Users, ArrowRight, ShieldAlert, CheckCircle, RefreshCw, ChevronLe
 import { joinRoom, checkRoomCapacity, logoutContestant } from '@/lib/actions';
 import { SiteLogo } from '@/components/SiteLogo';
 import { useNotification } from '@/context/NotificationContext';
+import { PartnerBanner } from '@/components/PartnerBanner';
 
 interface RecentRoom {
   roomId: string;
@@ -532,7 +533,7 @@ function JoinForm() {
 
 export default function JoinPage() {
   return (
-    <div className="h-screen max-h-screen overflow-hidden bg-[#edf2f9] text-slate-800 flex flex-col justify-between items-center p-3 sm:p-5 relative selection:bg-blue-500/20">
+    <div className="min-h-screen bg-[#edf2f9] text-slate-800 flex flex-col justify-between items-center p-3 sm:p-5 relative selection:bg-blue-500/20">
       {/* Ambient background glows */}
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-gradient-to-tr from-blue-300/30 via-indigo-200/20 to-transparent rounded-full blur-[120px] pointer-events-none" />
 
@@ -547,7 +548,7 @@ export default function JoinPage() {
         </Link>
       </div>
 
-      <div className="w-full max-w-md z-10 flex-1 min-h-0 flex flex-col justify-center my-auto overflow-y-auto pr-1">
+      <div className="w-full max-w-md z-10 flex-1 min-h-0 flex flex-col justify-center my-auto overflow-y-auto pr-1 py-2">
         {/* Header */}
         <div className="text-center mb-3 sm:mb-4 shrink-0">
           <SiteLogo size="md" className="mx-auto mb-2" />
@@ -568,6 +569,11 @@ export default function JoinPage() {
         >
           <JoinForm />
         </Suspense>
+
+        {/* Official Partner Banner */}
+        <div className="mt-3.5 shrink-0">
+          <PartnerBanner showLabel={true} />
+        </div>
       </div>
 
       <footer className="text-center text-[10px] uppercase tracking-wider text-slate-400 py-1 shrink-0">

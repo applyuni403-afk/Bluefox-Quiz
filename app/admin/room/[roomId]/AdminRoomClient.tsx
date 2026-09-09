@@ -64,6 +64,7 @@ import {
 } from 'lucide-react';
 import useSWR from 'swr';
 import { SiteLogo } from '@/components/SiteLogo';
+import { PartnerBanner } from '@/components/PartnerBanner';
 import { useNotification } from '@/context/NotificationContext';
 
 interface AdminRoomClientProps {
@@ -984,6 +985,11 @@ export function AdminRoomClient({ roomId }: AdminRoomClientProps) {
                 })}
               </div>
             )}
+          </div>
+
+          {/* Official Partner Banner */}
+          <div className="shrink-0 mt-1">
+            <PartnerBanner showLabel={true} />
           </div>
         </div>
 

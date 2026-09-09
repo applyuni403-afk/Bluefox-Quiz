@@ -12,6 +12,7 @@ import { NormalRoundBoard } from '@/components/NormalRoundBoard';
 import { RapidFireSetSelector } from '@/components/RapidFireSetSelector';
 import { SoundPlayer } from '@/components/SoundPlayer';
 import { SiteLogo } from '@/components/SiteLogo';
+import { PartnerBanner } from '@/components/PartnerBanner';
 import { useNotification } from '@/context/NotificationContext';
 import {
   logoutContestant,
@@ -490,6 +491,11 @@ export default function PlayRoomPage({
                       </div>
                     ))}
                 </div>
+
+                {/* Official Partner Banner */}
+                <div className="mt-4 max-w-xl mx-auto w-full shrink-0">
+                  <PartnerBanner showLabel={true} />
+                </div>
               </>
             );
           })()}
@@ -533,8 +539,13 @@ export default function PlayRoomPage({
             Final Score: <strong className="text-slate-900 font-black">{winner?.score || 0} PTS</strong>
           </p>
 
-          <div className="bg-white/85 backdrop-blur-2xl border border-blue-100 rounded-3xl p-4 mb-5 shadow-[0_15px_40px_rgba(30,58,138,0.06)] max-h-[40vh] overflow-y-auto">
+          <div className="bg-white/85 backdrop-blur-2xl border border-blue-100 rounded-3xl p-4 mb-4 shadow-[0_15px_40px_rgba(30,58,138,0.06)] max-h-[40vh] overflow-y-auto">
             <ScoreBoard contestants={contestants} activeContestantId={null} />
+          </div>
+
+          {/* Official Partner Banner */}
+          <div className="mb-5 max-w-md mx-auto w-full">
+            <PartnerBanner showLabel={true} />
           </div>
 
           <Link
@@ -984,6 +995,11 @@ export default function PlayRoomPage({
               )}
             </div>
           )}
+
+          {/* Official Partner Banner */}
+          <div className="mt-2 shrink-0">
+            <PartnerBanner showLabel={true} />
+          </div>
         </div>
 
         {/* Right Column: Scoreboard */}

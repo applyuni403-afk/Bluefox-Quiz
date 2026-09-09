@@ -27,6 +27,7 @@ import {
 } from '@/lib/actions';
 import { SiteLogo } from '@/components/SiteLogo';
 import { useNotification } from '@/context/NotificationContext';
+import { PartnerBanner } from '@/components/PartnerBanner';
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -241,6 +242,11 @@ export default function AdminLoginPage() {
                 </form>
               )}
             </div>
+
+            {/* Official Partner Banner */}
+            <div className="mt-3.5 w-full shrink-0">
+              <PartnerBanner showLabel={true} />
+            </div>
           </div>
 
           <footer className="text-center text-[10px] uppercase tracking-wider text-slate-400 py-1 shrink-0">
@@ -401,6 +407,11 @@ export default function AdminLoginPage() {
 
               <div className="mt-4 pt-3 border-t border-slate-100 text-[11px] text-slate-400">
                 <span>Hosts can configure questions, manage expandable live teams, and control live timers.</span>
+              </div>
+
+              {/* Official Partner Banner */}
+              <div className="mt-3.5 shrink-0">
+                <PartnerBanner showLabel={true} />
               </div>
             </div>
 

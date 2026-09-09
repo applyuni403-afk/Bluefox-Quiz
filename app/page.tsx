@@ -1,10 +1,11 @@
 import Link from 'next/link';
 import { Play, Shield, ArrowRight, Zap, Trophy, Flame, Sparkles } from 'lucide-react';
 import { SiteLogo } from '@/components/SiteLogo';
+import { PartnerBanner } from '@/components/PartnerBanner';
 
 export default function Home() {
   return (
-    <div className="h-screen max-h-screen overflow-hidden bg-[#edf2f9] text-slate-800 flex flex-col justify-between selection:bg-blue-500/20 selection:text-blue-900 relative">
+    <div className="min-h-screen bg-[#edf2f9] text-slate-800 flex flex-col justify-between selection:bg-blue-500/20 selection:text-blue-900 relative">
       {/* Dynamic ambient soft blue lights */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[350px] bg-gradient-to-b from-blue-300/30 via-indigo-200/20 to-transparent blur-[140px] pointer-events-none" />
       <div className="absolute bottom-0 right-0 w-[400px] h-[400px] bg-sky-200/30 blur-[160px] pointer-events-none" />
@@ -95,6 +96,11 @@ export default function Home() {
               <ArrowRight className="w-3.5 h-3.5" />
             </div>
           </Link>
+        </div>
+
+        {/* Official Partner Banner */}
+        <div className="w-full max-w-xl mb-4 z-10">
+          <PartnerBanner showLabel={true} />
         </div>
 
         {/* Feature Strip */}
